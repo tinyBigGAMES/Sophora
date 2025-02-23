@@ -35,8 +35,8 @@ uses
   Sophora.Console;
 
 type
-  { TsoBaseLLMModel }
-  TsoBaseLLMModel = class(TsoBaseObject)
+  { TsoModel }
+  TsoModel = class(TsoBaseObject)
   protected
     FModel: Pllama_model;
     FModelPath: string;
@@ -61,7 +61,7 @@ type
   TsoNextTokenEvent = reference to procedure(const AToken: string);
 
   { TsoInference }
-  TsoInference = class(TsoBaseLLMModel)
+  TsoInference = class(TsoModel)
   protected
     FActive: Boolean;
     FPrompt: string;
@@ -136,12 +136,12 @@ end;
 procedure TsoBaseLLMModel_LogCallback(ALevel: ggml_log_level; const AText: PUTF8Char; AUserData: Pointer); cdecl;
 begin
   if Assigned(AUserData) then
-    TsoBaseLLMModel(AUserData).OnInfo(ALevel, Utf8ToString(AText));
+    TsoModel(AUserData).OnInfo(ALevel, Utf8ToString(AText));
 end;
 
 function TsoBaseLLMModel_ProgressCallback(AProgress: single; AUserData: pointer): Boolean; cdecl;
 var
-  LBaseLLMModel: TsoBaseLLMModel;
+  LBaseLLMModel: TsoModel;
 begin
   LBaseLLMModel := AUserData;
   if Assigned(LBaseLLMModel) then
@@ -150,46 +150,46 @@ begin
     Result := True;
 end;
 
-{ TsoBaseLLMModel }
-procedure TsoBaseLLMModel.OnInfo(const ALevel: Integer; const AText: string);
+{ TsoModel }
+procedure TsoModel.OnInfo(const ALevel: Integer; const AText: string);
 begin
   //atConsole.Print(AText);
 end;
 
-function  TsoBaseLLMModel.OnLoadModelProgress(const AModelFilename: string; const AProgress: Single): Boolean;
+function  TsoModel.OnLoadModelProgress(const AModelFilename: string; const AProgress: Single): Boolean;
 begin
   Result := True;
 
   //atConsole.Print(#13+'Loading model "%s" (%3.2f%s)...', [AModelFilename, AProgress*100, '%']);
 end;
 
-procedure TsoBaseLLMModel.OnLoadModel(const AModelFilename: string; const ASuccess: Boolean);
+procedure TsoModel.OnLoadModel(const AModelFilename: string; const ASuccess: Boolean);
 begin
 end;
 
-constructor TsoBaseLLMModel.Create();
+constructor TsoModel.Create();
 begin
   inherited;
   FModelPath := CsoDefaultModelPath;
 end;
 
-destructor TsoBaseLLMModel.Destroy();
+destructor TsoModel.Destroy();
 begin
   UnloadModel();
   inherited;
 end;
 
-function  TsoBaseLLMModel.GetModelPath(): string;
+function  TsoModel.GetModelPath(): string;
 begin
   Result := FModelPath;
 end;
 
-procedure TsoBaseLLMModel.SetModelPath(const APath: string);
+procedure TsoModel.SetModelPath(const APath: string);
 begin
   FModelPath := APath;
 end;
 
-function  TsoBaseLLMModel.LoadModel(const AMainGPU: Integer; const AGPULayers: Integer; const AFilename: string): Boolean;
+function  TsoModel.LoadModel(const AMainGPU: Integer; const AGPULayers: Integer; const AFilename: string): Boolean;
 var
   LModelParams: llama_model_params;
   LFilename: string;
@@ -235,7 +235,7 @@ begin
   Result := True;
 end;
 
-function  TsoBaseLLMModel.ModelLoaded(): Boolean;
+function  TsoModel.ModelLoaded(): Boolean;
 begin
   Result := False;
   if not Assigned(FModel) then Exit;
@@ -243,7 +243,7 @@ begin
   Result := True;
 end;
 
-procedure TsoBaseLLMModel.UnloadModel();
+procedure TsoModel.UnloadModel();
 begin
   if not ModelLoaded() then Exit;
   llama_free_model(FModel);

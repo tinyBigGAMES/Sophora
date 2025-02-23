@@ -17,17 +17,48 @@
 
 (*
   === USAGE NOTES ===
-  1. Download model from:
+   * Download model from:
      - https://huggingface.co/tinybiggames/DeepHermes-3-Llama-3-8B-Preview-Q4_K_M-GGUF/resolve/main/deephermes-3-llama-3-8b-preview-q4_k_m.gguf?download=true
      - https://huggingface.co/tinybiggames/bge-m3-Q8_0-GGUF/resolve/main/bge-m3-q8_0.gguf?download=true
-  2. Place in your desired location, the examples expect:
+   * Place in your desired location, the examples expect:
      - C:/LLM/GGUF
 
-  3. Get search api key from:
+   * Get search api key from:
      - https://tavily.com/
      - You get 1000 free tokens per month
      - Create a an environment variable named "TAVILY_API_KEY" and set it to
        the search api key.
+
+   * Explanation of SQL Static Macros (&text) and Dynamic Parameters (:text):
+     1. SQL Static Macros (&text):
+        - Purpose: Static macros are placeholders in your SQL query that are
+          replaced with fixed values or strings at the time the SQL text is
+          prepared.
+        - How it works: When you use &text in your SQL statement, it acts as a
+          macro that is replaced with a specific value or table name before the
+          query is executed. This is typically used for SQL elements that don't
+          change per execution, like table names or field names.
+        - Example: If you have 'SELECT * FROM &table;' in your SQL text, and
+          you set &table to 'users', the final SQL executed would be
+          'SELECT * FROM users;'.
+        - Analogy: Think of it like a "find and replace" that happens before
+          the query runs.
+
+     2. SQL Dynamic Parameters (:text):
+        - Purpose: Dynamic parameters are used to securely insert variable data
+          into SQL queries at runtime. They are typically used for values that
+          can change, such as user input or variable data, and are often used
+          to prevent SQL injection.
+        - How it works: When you use :text in your SQL statement, it acts as a
+          placeholder that will be dynamically replaced with an actual value at
+          runtime. The value is passed separately from the SQL query, allowing
+          for secure and flexible data handling.
+        - Example: If you have 'SELECT * FROM users WHERE id = :userId;' in
+          your SQL text, and you bind :userId to the value '42', the final SQL
+          executed would be 'SELECT * FROM users WHERE id = 42;'.
+        - Analogy: Think of it as a variable that gets its value just before
+          the SQL query is run, making it possible to execute the same query
+          with different data multiple times.
 *)
 
 unit UTestbed;
@@ -39,10 +70,10 @@ uses
   Sophora.CLibs,
   Sophora.Utils,
   Sophora.Common,
+  Sophora.Console,
   Sophora.Messages,
   Sophora.Inference,
-  Sophora.RAG,
-  Sophora.Console;
+  Sophora.RAG;
 
 procedure RunTests();
 
@@ -279,6 +310,88 @@ begin
   end;
 end;
 
+{
+  This example demonstrates how to use the local SQLite3 database engine with
+  the Sophora framework.
+
+  It performs the following operations:
+  1. Connects to an SQLite3 database named "articles.db".
+  2. Drops the "articles" table if it already exists.
+  3. Creates a new "articles" table.
+  4. Inserts predefined articles into the table.
+  5. Queries and displays the contents of the table in JSON format.
+
+  This is the foundational step for implementing a full Retrieval-Augmented
+  Generation (RAG) system.
+}
+procedure Test04();
+const
+  // SQL statement to remove the "articles" table if it already exists
+  CDropTableSQL = 'DROP TABLE IF EXISTS articles';
+
+  // SQL statement to create the "articles" table with a single TEXT column
+  CCreateTableSQL = 'CREATE TABLE IF NOT EXISTS articles (' +
+                    'headline TEXT' +
+                    ');';
+
+  // SQL statement to insert sample articles into the "articles" table
+  CInsertArticlesSQL = 'INSERT INTO articles VALUES ' +
+    '(''Shohei Ohtani''''s ex-interpreter pleads guilty to charges related to gambling and theft''), ' +
+    '(''The jury has been selected in Hunter Biden''''s gun trial''), ' +
+    '(''Larry Allen, a Super Bowl champion and famed Dallas Cowboy, has died at age 52''), ' +
+    '(''After saying Charlotte, a lone stingray, was pregnant, aquarium now says she''''s sick''), ' +
+    '(''An Epoch Times executive is facing money laundering charge'');';
+
+  // SQL statement to select all records from the "articles" table
+  CListArticles = 'SELECT * FROM articles';
+
+var
+  // Database object for handling SQLite operations
+  LDb: TsoDatabase;
+begin
+  // Create an instance of the database engine
+  LDb := TsoDatabase.Create();
+
+  try
+    // Open the SQLite database file
+    if LDb.Open('articles.db') then
+    begin
+      // Drop the existing "articles" table if it exists
+      if LDb.ExecuteSQL(CDropTableSQL) then
+        soConsole.PrintLn('Removing "articles" table if it exists...')
+      else
+        soConsole.PrintLn('Error: %s', [LDb.GetError()]);
+
+      // Create the "articles" table
+      if LDb.ExecuteSQL(CCreateTableSQL) then
+        soConsole.PrintLn('Created "articles" table...')
+      else
+        soConsole.PrintLn('Error: %s', [LDb.GetError()]);
+
+      // Insert predefined articles into the table
+      if LDb.ExecuteSQL(CInsertArticlesSQL) then
+        soConsole.PrintLn('Added articles into "articles" table...')
+      else
+        soConsole.PrintLn('Error: %s', [LDb.GetError()]);
+
+      // Query and display the articles as JSON
+      if LDb.ExecuteSQL(CListArticles) then
+      begin
+        soConsole.PrintLn('Displaying "articles" table content...');
+        soConsole.PrintLn(LDb.GetResponseText());
+      end
+      else
+        soConsole.PrintLn('Error: %s', [LDb.GetError()]);
+
+      // Close the database connection
+      LDb.Close();
+    end;
+  finally
+    // Free allocated database object to avoid memory leaks
+    LDb.Free();
+  end;
+end;
+
 
 {
   This procedure serves as a test harness for running different test cases
@@ -297,13 +410,14 @@ begin
   soConsole.PrintLn(soCSIFGMagenta + 'Sophora v%s' + soCRLF, [CsoSophoraVersion]);
 
   // Set the test number to execute
-  LNum := 01;
+  LNum := 04;
 
   // Execute the corresponding test based on the selected test number
   case LNum of
     01: Test01();  // Runs the non-thinking mode test
     02: Test02();  // Runs the deep-thinking mode test
     03: Test03();  // Runs the embedding generation test
+    04: Test04();  // Runs the sqlite database test
   end;
 
   // Pause execution to allow viewing the console output before exiting
