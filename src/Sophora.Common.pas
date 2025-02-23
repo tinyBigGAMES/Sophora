@@ -39,8 +39,10 @@ const
   CsoDefaultModelPath  = 'C:/LLM/GGUF';
 
   CsoGeneralLLMFilename = 'deephermes-3-llama-3-8b-preview-q4_k_m.gguf';
-  CsoEmbeddingsLLMFilename = 'bge-m3-q8_0.gguf';
-
+  //CsoEmbeddingsLLMFilename = 'bge-m3-q8_0.gguf';
+  //CsoEmbeddingsLLMFilename = 'all-minilm-l6-v2-q8_0.gguf';
+  //CsoEmbeddingsLLMFilename = 'bge-m3-F16.gguf';
+  CsoEmbeddingsLLMFilename = 'deephermes-3-llama-3-8b-preview-q4_k_m.gguf';
 
 type
 

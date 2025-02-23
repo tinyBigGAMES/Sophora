@@ -1,13 +1,13 @@
-{===============================================================================
+﻿{===============================================================================
   ___           _
- / __| ___ _ __| |_  ___ _ _ __ _ �
+ / __| ___ _ __| |_  ___ _ _ __ _ ™
  \__ \/ _ \ '_ \ ' \/ _ \ '_/ _` |
  |___/\___/ .__/_||_\___/_| \__,_|
           |_|
  AI Reasoning, Function-calling &
        Knowledge Retrieval
 
- Copyright � 2025-present tinyBigGAMES� LLC
+ Copyright © 2025-present tinyBigGAMES™ LLC
  All Rights Reserved.
 
  https://github.com/tinyBigGAMES/Sophora
@@ -23,14 +23,18 @@ interface
 
 uses
   System.Generics.Collections,
+  System.Generics.Defaults,
   System.SysUtils,
   System.IOUtils,
   System.Classes,
   System.JSON,
+  System.Math,
+  System.NetEncoding,
   Sophora.CLibs,
   Sophora.Utils,
   Sophora.Common,
-  Sophora.Inference;
+  Sophora.Inference,
+  Sophora.Console;
 
 type
 
@@ -85,6 +89,23 @@ type
     function  Execute(): Boolean;
     function  ExecuteSQL(const ASQL: string): Boolean;
     function  GetResponseText(): string;
+  end;
+
+  { TsoVectorDatabase }
+  TsoVectorDatabase = class(TsoBaseObject)
+  private
+    FEmbeddings: TsoEmbeddings;
+    FDatabase: TsoDatabase;
+    procedure CreateTableIfNotExists();
+    function CosineSimilarity(const Vec1, Vec2: TArray<Single>): Double;
+  public
+    constructor Create(); override;
+    destructor Destroy; override;
+
+    function Open(const AFilename: string): Boolean;
+    procedure Close();
+    function AddDocument(const ADocID: string; const AText: string): Boolean;
+    function Search(const AQuery: string; const ATopK: Integer = 5): TJSONArray;
   end;
 
 implementation
@@ -439,8 +460,8 @@ var
     case sqlite3_column_type(AStmt, AColumn) of
       SQLITE_INTEGER: Result := IntToStr(sqlite3_column_int(AStmt, AColumn));
       SQLITE_FLOAT: Result := FloatToStr(sqlite3_column_double(AStmt, AColumn));
-      SQLITE_TEXT: Result := string(PWideChar(sqlite3_column_text16(AStmt, i)));
-      SQLITE_BLOB: Result := '[Blob Data]';  // BLOB data typically needs special handling
+      SQLITE_TEXT: Result := string(PWideChar(sqlite3_column_text16(AStmt, AColumn))); // Fixed AColumn usage
+      SQLITE_BLOB: Result := '[Blob Data]';
       SQLITE_NULL: Result := 'NULL';
     else
       Result := 'Unknown';
@@ -458,13 +479,6 @@ begin
     Exit;
   end;
 
-  if ASQL.StartsWith('with') then
-  begin
-    writeln('got here');
-    writeln(sqlite3_bind_text16(FStmt, 1,PChar('firearm courtroom'), -1, sqlite3_destructor_type(0)));
-  end;
-
-
   LRes := sqlite3_step(FStmt);
   if (LRes <> SQLITE_DONE) and (LRes <> SQLITE_ROW) then
   begin
@@ -477,27 +491,43 @@ begin
   FResponseText := '';
   if LRes = SQLITE_ROW then
   begin
-    FDataset := TJSONArray.Create;
-    while LRes = SQLITE_ROW do
-    begin
-      var Row := TJSONObject.Create;
-      for i := 0 to sqlite3_column_count(FStmt) - 1 do
+    try
+      // Free the current Dataset
+      if Assigned(FJSON) then
       begin
-        LName := string(PWideChar(sqlite3_column_name16(FStmt, i)));
-        LValue := GetTypeAsString(FStmt, i);
-
-        Row.AddPair(LName, LValue);
+        FJSON.Free();
+        FJSON := nil;
       end;
-      FDataset.AddElement(Row);
-      LRes := sqlite3_step(FStmt);
+
+      FDataset := TJSONArray.Create;
+      while LRes = SQLITE_ROW do
+      begin
+        var Row := TJSONObject.Create;
+        for I := 0 to sqlite3_column_count(FStmt) - 1 do
+        begin
+          LName := string(PWideChar(sqlite3_column_name16(FStmt, I)));
+          LValue := GetTypeAsString(FStmt, I);
+          Row.AddPair(LName, LValue);
+        end;
+        FDataset.AddElement(Row);
+        LRes := sqlite3_step(FStmt);
+      end;
+      FJSON := TJSONObject.Create;
+      FJSON.AddPair('response', FDataset);
+      FResponseText := FJSON.Format();
+    except
+      on E: Exception do
+      begin
+        FreeAndNil(FDataset);
+        FreeAndNil(FJSON);
+        raise; // Re-raise to ensure the caller handles it
+      end;
     end;
-    FJSON := TJSONObject.Create;
-    FJSON.AddPair('response', FDataset);
-    FResponseText := FJson.Format();
   end;
 
   FError := '';
   Result := True;
+  sqlite3_reset(FStmt);  // Reset instead of immediate finalize
   sqlite3_finalize(FStmt);
   FStmt := nil;
 end;
@@ -506,5 +536,222 @@ function TsoDatabase.GetResponseText(): string;
 begin
   Result := FResponseText;
 end;
+
+
+{ TsoVectorDatabase }
+constructor TsoVectorDatabase.Create();
+begin
+  inherited;
+  FEmbeddings := TsoEmbeddings.Create;
+  FDatabase := TsoDatabase.Create;
+end;
+
+destructor TsoVectorDatabase.Destroy();
+begin
+  Close();
+
+  FDatabase.Free();
+  FEmbeddings.Free();
+
+  inherited;
+end;
+
+function TsoVectorDatabase.Open(const AFilename: string): Boolean;
+begin
+  Result := False;
+
+  if not FEmbeddings.LoadModel(0, 0) then Exit;
+  if not FDatabase.Open(AFilename) then Exit;
+
+  CreateTableIfNotExists();
+
+  Result := True;
+end;
+
+procedure TsoVectorDatabase.Close();
+begin
+  FDatabase.Close();
+  FEmbeddings.UnloadModel();
+end;
+
+procedure TsoVectorDatabase.CreateTableIfNotExists();
+begin
+  FDatabase.ClearSQLText();
+  FDatabase.SetMacro('table', 'vectors');
+  FDatabase.AddSQLText('CREATE TABLE IF NOT EXISTS &table (' +
+                       'id TEXT PRIMARY KEY, ' +
+                       'text TEXT, ' +
+                       'embedding BLOB)');
+  FDatabase.Execute();
+end;
+
+(*
+function TsoVectorDatabase.CosineSimilarity(const Vec1, Vec2: TArray<Single>): Double;
+var
+  DotProduct, Norm1, Norm2: Double;
+  I: Integer;
+begin
+  DotProduct := 0;
+  Norm1 := 0;
+  Norm2 := 0;
+
+  for I := Low(Vec1) to High(Vec1) do
+  begin
+    DotProduct := DotProduct + (Vec1[I] * Vec2[I]);
+    Norm1 := Norm1 + (Vec1[I] * Vec1[I]);
+    Norm2 := Norm2 + (Vec2[I] * Vec2[I]);
+  end;
+
+  if (Norm1 = 0) or (Norm2 = 0) then
+    Exit(0);
+
+  Result := DotProduct / (Sqrt(Norm1) * Sqrt(Norm2));
+end;
+*)
+
+function TsoVectorDatabase.CosineSimilarity(const Vec1, Vec2: TArray<Single>): Double;
+var
+  DotProduct, Norm1, Norm2: Double;
+  I: Integer;
+begin
+  DotProduct := 0;
+  Norm1 := 0;
+  Norm2 := 0;
+
+  for I := Low(Vec1) to High(Vec1) do
+  begin
+    DotProduct := DotProduct + (Vec1[I] * Vec2[I]);
+    Norm1 := Norm1 + (Vec1[I] * Vec1[I]);
+    Norm2 := Norm2 + (Vec2[I] * Vec2[I]);
+  end;
+
+  Norm1 := Sqrt(Norm1);
+  Norm2 := Sqrt(Norm2);
+
+  // ✅ Prevent divide by zero
+  if (Norm1 < 1e-6) or (Norm2 < 1e-6) then
+    Exit(0.0);
+
+  Result := DotProduct / (Norm1 * Norm2);
+
+  // ✅ Ensure result stays between -1 and 1
+  if Result > 1 then Result := 1;
+  if Result < -1 then Result := -1;
+end;
+
+
+function TsoVectorDatabase.AddDocument(const ADocID: string; const AText: string): Boolean;
+var
+  Embedding: TArray<Single>;
+  EmbeddingBlob: TBytes;
+  EncodedEmbedding: string;
+  Size: Integer;
+begin
+  Embedding := FEmbeddings.Generate(AText);
+  Size := Length(Embedding) * SizeOf(Single);
+  SetLength(EmbeddingBlob, Size);
+
+  // Optimized memory move
+  Move(Embedding[0], EmbeddingBlob[0], Size);
+
+  // Encode BLOB as Base64 string
+  EncodedEmbedding := TNetEncoding.Base64.EncodeBytesToString(EmbeddingBlob);
+
+  FDatabase.ClearSQLText;
+  FDatabase.SetMacro('table', 'vectors');
+  FDatabase.AddSQLText('INSERT OR REPLACE INTO &table (id, text, embedding) VALUES (:id, :text, :embedding)');
+  FDatabase.SetParam('id', ADocID);
+  FDatabase.SetParam('text', AText);
+  FDatabase.SetParam('embedding', EncodedEmbedding);  // Base64-encoded BLOB
+
+  Result := FDatabase.Execute;
+end;
+
+function TsoVectorDatabase.Search(const AQuery: string; const ATopK: Integer = 5): TJSONArray;
+var
+  QueryEmbedding: TArray<Single>;
+  DocID, TextData, EncodedEmbedding: string;
+  DBEmbedding: TArray<Single>;
+  EmbeddingBlob: TBytes;
+  SimilarityScores: TList<TPair<Single, string>>;  // Now using Single instead of Double
+  Score: Single;  // Changed to Single
+  I, VectorSize: Integer;
+  JSONObject: TJSONObject;
+  JSONPairID, JSONPairScore: TJSONPair;
+begin
+  QueryEmbedding := FEmbeddings.Generate(AQuery);
+  SimilarityScores := TList<TPair<Single, string>>.Create;
+  Result := TJSONArray.Create;
+
+  try
+    FDatabase.ClearSQLText;
+    FDatabase.SetMacro('table', 'vectors');
+    FDatabase.AddSQLText('SELECT id, text, embedding FROM &table');
+
+    if not FDatabase.Execute then
+    begin
+      SimilarityScores.Free;
+      Result.Free;
+      Exit(nil);
+    end;
+
+    for I := 0 to FDatabase.RecordCount - 1 do
+    begin
+      DocID := FDatabase.GetField(I, 'id');
+      TextData := FDatabase.GetField(I, 'text');
+
+      // Retrieve and decode Base64-encoded embedding
+      EncodedEmbedding := FDatabase.GetField(I, 'embedding');
+      EmbeddingBlob := TNetEncoding.Base64.DecodeStringToBytes(EncodedEmbedding);
+
+      // Convert byte array back to float array
+      VectorSize := Length(EmbeddingBlob) div SizeOf(Single);
+      SetLength(DBEmbedding, VectorSize);
+
+      if VectorSize > 0 then
+        Move(EmbeddingBlob[0], DBEmbedding[0], Length(EmbeddingBlob));
+
+      // Compute similarity
+      Score := CosineSimilarity(QueryEmbedding, DBEmbedding);
+
+      // Store similarity in a sortable list
+      SimilarityScores.Add(TPair<Single, string>.Create(Score, DocID));
+    end;
+
+    // Sort by similarity in descending order
+    SimilarityScores.Sort(
+      TComparer<TPair<Single, string>>.Construct(
+        function(const Left, Right: TPair<Single, string>): Integer
+        begin
+          Result := CompareValue(Right.Key, Left.Key);
+        end
+      )
+    );
+
+    // Add top results to JSON
+    for I := 0 to Min(ATopK - 1, SimilarityScores.Count - 1) do
+    begin
+      JSONObject := TJSONObject.Create;
+      try
+        JSONPairID := TJSONPair.Create('id', TJSONString.Create(SimilarityScores[I].Value));
+        JSONPairScore := TJSONPair.Create('score', TJSONNumber.Create(SimilarityScores[I].Key));
+
+        JSONObject.AddPair(JSONPairID);
+        JSONObject.AddPair(JSONPairScore);
+        Result.AddElement(JSONObject);
+      except
+        raise;
+      end;
+    end;
+
+  finally
+    SimilarityScores.Free;
+  end;
+end;
+
+
+
+
+
 
 end.

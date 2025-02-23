@@ -19,7 +19,6 @@
   === USAGE NOTES ===
    * Download model from:
      - https://huggingface.co/tinybiggames/DeepHermes-3-Llama-3-8B-Preview-Q4_K_M-GGUF/resolve/main/deephermes-3-llama-3-8b-preview-q4_k_m.gguf?download=true
-     - https://huggingface.co/tinybiggames/bge-m3-Q8_0-GGUF/resolve/main/bge-m3-q8_0.gguf?download=true
    * Place in your desired location, the examples expect:
      - C:/LLM/GGUF
 
@@ -66,7 +65,9 @@ unit UTestbed;
 interface
 
 uses
+  System.Generics.Collections,
   System.SysUtils,
+  System.JSON,
   Sophora.CLibs,
   Sophora.Utils,
   Sophora.Common,
@@ -394,6 +395,136 @@ end;
 
 
 {
+  This example demonstrates how to use DeepHermes-3 to generate embeddings for a vector database,
+  which is a key component of a Retrieval-Augmented Generation (RAG) system.
+
+  The procedure performs the following steps:
+  1. Opens an existing vector database (`vectors.db`).
+  2. Adds sample documents to the database.
+  3. Runs a series of test queries to retrieve the most relevant documents based on similarity.
+  4. Displays results in a formatted table, showing query terms, retrieved document IDs,
+     ranking, and similarity scores.
+
+  The test queries include:
+  - Basic keywords related to AI and machine learning.
+  - Concept-based queries to test semantic understanding.
+  - Reworded queries using synonyms to check generalization.
+  - Long, natural-language queries to simulate RAG-like retrieval.
+}
+procedure Test05();
+var
+  // Object representing the vector database
+  LVectorDB: TsoVectorDatabase;
+
+  // JSON array to store search results
+  LSearchResults: TJSONArray;
+
+  // Array of test queries to evaluate search performance
+  LQueries: array of string;
+
+  // Loop variables for iterating through queries and results
+  I, J: Integer;
+
+  // JSON object representing a single search result
+  LSearchResultObj: TJSONObject;
+
+  // Stores document ID and similarity score
+  LDocID: string;
+  LScore: Single;
+
+  // Column width variables for formatting the output table
+  LQueryColWidth, LDocColWidth, LScoreColWidth: Integer;
+  LRankColWidth, LLineWidth: Integer;
+begin
+  // Create an instance of the vector database
+  LVectorDB := TsoVectorDatabase.Create();
+
+  try
+    // Open the vector database; exit if it fails
+    if not LVectorDB.Open('vectors.db') then Exit;
+
+    // Add sample documents to the vector database
+    soConsole.PrintLn('Adding documents...');
+    LVectorDB.AddDocument('doc1', 'This is an example document.');
+    LVectorDB.AddDocument('doc2', 'Another piece of text related to AI.');
+    LVectorDB.AddDocument('doc3', 'This document is about machine learning and AI.');
+
+    // Define test queries
+    SetLength(LQueries, 17);
+    LQueries[0] := 'AI';
+    LQueries[1] := 'machine learning';
+    LQueries[2] := 'document';
+    LQueries[3] := 'example';
+    LQueries[4] := 'related to AI';
+
+    // Concept-Based Queries
+    LQueries[5] := 'Neural networks';
+    LQueries[6] := 'Deep learning techniques';
+    LQueries[7] := 'Artificial intelligence advancements';
+    LQueries[8] := 'Text similarity in AI';
+    LQueries[9] := 'Training large language models';
+
+    // Reworded Queries (Synonyms)
+    LQueries[10] := 'intelligent algorithms';
+    LQueries[11] := 'automated learning';
+    LQueries[12] := 'document text';
+    LQueries[13] := 'a file related to artificial intelligence';
+
+    // Long, Natural Language Queries (RAG-style)
+    LQueries[14] := 'What is the relationship between AI and machine learning?';
+    LQueries[15] := 'Can you summarize a document related to AI?';
+    LQueries[16] := 'Retrieve documents discussing AI-related topics';
+
+    // Set column widths for table formatting
+    LQueryColWidth := 45;  // Adjust based on longest query
+    LRankColWidth := 6;
+    LDocColWidth := 10;
+    LScoreColWidth := 10;
+    LLineWidth := LQueryColWidth + LRankColWidth + LDocColWidth + LScoreColWidth + 10;
+
+    // Print Table Header
+    soConsole.PrintLn(StringOfChar('-', LLineWidth));
+    soConsole.PrintLn(Format('| %-*s | %-*s | %-*s | %-*s |',
+      [LQueryColWidth, 'Query', LRankColWidth, 'Rank', LDocColWidth, 'Document', LScoreColWidth, 'Score']));
+    soConsole.PrintLn(StringOfChar('-', LLineWidth));
+
+    // Execute each test query and display the results
+    for I := 0 to High(LQueries) do
+    begin
+      // Search the vector database for the top 3 most relevant documents
+      LSearchResults := LVectorDB.Search(LQueries[I], 3);
+
+      if Assigned(LSearchResults) then
+      begin
+        for J := 0 to LSearchResults.Count - 1 do
+        begin
+          // Extract document ID and similarity score from the search result
+          LSearchResultObj := LSearchResults.Items[J] as TJSONObject;
+          LDocID := LSearchResultObj.GetValue('id').Value;
+          LScore := (LSearchResultObj.GetValue('score') as TJSONNumber).AsDouble;
+
+          // Print formatted table row
+          soConsole.PrintLn(Format('| %-*s | %-*d | %-*s | %-*.6f |',
+            [LQueryColWidth, LQueries[I], LRankColWidth, J + 1, LDocColWidth, LDocID, LScoreColWidth, LScore]));
+        end;
+
+        // Free the search result JSON array after processing
+        LSearchResults.Free();
+      end;
+
+      // Print table row separator after processing each query
+      soConsole.PrintLn(StringOfChar('-', LLineWidth));
+    end;
+
+  finally
+    // Free allocated resources to prevent memory leaks
+    LVectorDB.Free();
+  end;
+
+end;
+
+
+{
   This procedure serves as a test harness for running different test cases
   related to the Large Language Model (LLM) functionalities, such as
   non-thinking mode, deep-thinking mode, and embedding generation.
@@ -410,7 +541,7 @@ begin
   soConsole.PrintLn(soCSIFGMagenta + 'Sophora v%s' + soCRLF, [CsoSophoraVersion]);
 
   // Set the test number to execute
-  LNum := 04;
+  LNum := 05;
 
   // Execute the corresponding test based on the selected test number
   case LNum of
@@ -418,6 +549,7 @@ begin
     02: Test02();  // Runs the deep-thinking mode test
     03: Test03();  // Runs the embedding generation test
     04: Test04();  // Runs the sqlite database test
+    05: Test05();  // Runs the vector database test
   end;
 
   // Pause execution to allow viewing the console output before exiting

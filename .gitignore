@@ -84,3 +84,6 @@ modules/
 *.dsv
 zip_latest_commit.cmd
 Sophora.zip
+
+bin/articles.db
+bin/vectors.db
