@@ -82,3 +82,5 @@ modules/
 
 # Sophora
 *.dsv
+zip_latest_commit.cmd
+Sophora.zip
