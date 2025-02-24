@@ -97,15 +97,16 @@ type
     FEmbeddings: TsoEmbeddings;
     FDatabase: TsoDatabase;
     procedure CreateTableIfNotExists();
-    function CosineSimilarity(const Vec1, Vec2: TArray<Single>): Double;
+    function CosineSimilarity(const AVec1, AVec2: TArray<Single>): Double;
   public
     constructor Create(); override;
     destructor Destroy; override;
 
-    function Open(const AFilename: string): Boolean;
+    function Open(const AFilename: string; const AMainGPU: Integer=0; const AGPULayers: Integer=0): Boolean;
     procedure Close();
     function AddDocument(const ADocID: string; const AText: string): Boolean;
-    function Search(const AQuery: string; const ATopK: Integer = 5): TJSONArray;
+    function AddLargeDocument(const ADocID, ATitle, AText: string; const AChunkSize: Integer): Boolean;
+    function Search(const AQuery: string; const ATopK: Integer = 5; const AQueryLimit: Integer = 1000): TJSONArray;
   end;
 
 implementation
@@ -454,6 +455,7 @@ var
   I: Integer;
   LName: string;
   LValue: string;
+  LRow: TJSONObject;
 
   function GetTypeAsString(AStmt: Psqlite3_stmt; AColumn: Integer): string;
   begin
@@ -502,14 +504,14 @@ begin
       FDataset := TJSONArray.Create;
       while LRes = SQLITE_ROW do
       begin
-        var Row := TJSONObject.Create;
+        LRow := TJSONObject.Create;
         for I := 0 to sqlite3_column_count(FStmt) - 1 do
         begin
           LName := string(PWideChar(sqlite3_column_name16(FStmt, I)));
           LValue := GetTypeAsString(FStmt, I);
-          Row.AddPair(LName, LValue);
+          LRow.AddPair(LName, LValue);
         end;
-        FDataset.AddElement(Row);
+        FDataset.AddElement(LRow);
         LRes := sqlite3_step(FStmt);
       end;
       FJSON := TJSONObject.Create;
@@ -556,11 +558,11 @@ begin
   inherited;
 end;
 
-function TsoVectorDatabase.Open(const AFilename: string): Boolean;
+function TsoVectorDatabase.Open(const AFilename: string; const AMainGPU: Integer; const AGPULayers: Integer): Boolean;
 begin
   Result := False;
 
-  if not FEmbeddings.LoadModel(0, 0) then Exit;
+  if not FEmbeddings.LoadModel(AMainGPU, AGPULayers) then Exit;
   if not FDatabase.Open(AFilename) then Exit;
 
   CreateTableIfNotExists();
@@ -585,54 +587,30 @@ begin
   FDatabase.Execute();
 end;
 
-(*
-function TsoVectorDatabase.CosineSimilarity(const Vec1, Vec2: TArray<Single>): Double;
+function TsoVectorDatabase.CosineSimilarity(const AVec1, AVec2: TArray<Single>): Double;
 var
-  DotProduct, Norm1, Norm2: Double;
+  LDotProduct, LNorm1, LNorm2: Double;
   I: Integer;
 begin
-  DotProduct := 0;
-  Norm1 := 0;
-  Norm2 := 0;
+  LDotProduct := 0;
+  LNorm1 := 0;
+  LNorm2 := 0;
 
-  for I := Low(Vec1) to High(Vec1) do
+  for I := Low(AVec1) to High(AVec1) do
   begin
-    DotProduct := DotProduct + (Vec1[I] * Vec2[I]);
-    Norm1 := Norm1 + (Vec1[I] * Vec1[I]);
-    Norm2 := Norm2 + (Vec2[I] * Vec2[I]);
+    LDotProduct := LDotProduct + (AVec1[I] * AVec2[I]);
+    LNorm1 := LNorm1 + (AVec1[I] * AVec1[I]);
+    LNorm2 := LNorm2 + (AVec2[I] * AVec2[I]);
   end;
 
-  if (Norm1 = 0) or (Norm2 = 0) then
-    Exit(0);
-
-  Result := DotProduct / (Sqrt(Norm1) * Sqrt(Norm2));
-end;
-*)
-
-function TsoVectorDatabase.CosineSimilarity(const Vec1, Vec2: TArray<Single>): Double;
-var
-  DotProduct, Norm1, Norm2: Double;
-  I: Integer;
-begin
-  DotProduct := 0;
-  Norm1 := 0;
-  Norm2 := 0;
-
-  for I := Low(Vec1) to High(Vec1) do
-  begin
-    DotProduct := DotProduct + (Vec1[I] * Vec2[I]);
-    Norm1 := Norm1 + (Vec1[I] * Vec1[I]);
-    Norm2 := Norm2 + (Vec2[I] * Vec2[I]);
-  end;
-
-  Norm1 := Sqrt(Norm1);
-  Norm2 := Sqrt(Norm2);
+  LNorm1 := Sqrt(LNorm1);
+  LNorm2 := Sqrt(LNorm2);
 
   // ✅ Prevent divide by zero
-  if (Norm1 < 1e-6) or (Norm2 < 1e-6) then
+  if (LNorm1 < 1e-6) or (LNorm2 < 1e-6) then
     Exit(0.0);
 
-  Result := DotProduct / (Norm1 * Norm2);
+  Result := LDotProduct / (LNorm1 * LNorm2);
 
   // ✅ Ensure result stays between -1 and 1
   if Result > 1 then Result := 1;
@@ -642,116 +620,153 @@ end;
 
 function TsoVectorDatabase.AddDocument(const ADocID: string; const AText: string): Boolean;
 var
-  Embedding: TArray<Single>;
-  EmbeddingBlob: TBytes;
-  EncodedEmbedding: string;
-  Size: Integer;
+  LEmbedding: TArray<Single>;
+  LEmbeddingBlob: TBytes;
+  LEncodedEmbedding: string;
+  LSize: Integer;
 begin
-  Embedding := FEmbeddings.Generate(AText);
-  Size := Length(Embedding) * SizeOf(Single);
-  SetLength(EmbeddingBlob, Size);
+  LEmbedding := FEmbeddings.Generate(AText);
+  LSize := Length(LEmbedding) * SizeOf(Single);
+  SetLength(LEmbeddingBlob, LSize);
 
   // Optimized memory move
-  Move(Embedding[0], EmbeddingBlob[0], Size);
+  Move(LEmbedding[0], LEmbeddingBlob[0], LSize);
 
   // Encode BLOB as Base64 string
-  EncodedEmbedding := TNetEncoding.Base64.EncodeBytesToString(EmbeddingBlob);
+  LEncodedEmbedding := TNetEncoding.Base64.EncodeBytesToString(LEmbeddingBlob);
 
   FDatabase.ClearSQLText;
   FDatabase.SetMacro('table', 'vectors');
   FDatabase.AddSQLText('INSERT OR REPLACE INTO &table (id, text, embedding) VALUES (:id, :text, :embedding)');
   FDatabase.SetParam('id', ADocID);
   FDatabase.SetParam('text', AText);
-  FDatabase.SetParam('embedding', EncodedEmbedding);  // Base64-encoded BLOB
+  FDatabase.SetParam('embedding', LEncodedEmbedding);  // Base64-encoded BLOB
 
   Result := FDatabase.Execute;
 end;
 
-function TsoVectorDatabase.Search(const AQuery: string; const ATopK: Integer = 5): TJSONArray;
+function TsoVectorDatabase.AddLargeDocument(const ADocID, ATitle, AText: string; const AChunkSize: Integer): Boolean;
 var
-  QueryEmbedding: TArray<Single>;
-  DocID, TextData, EncodedEmbedding: string;
-  DBEmbedding: TArray<Single>;
-  EmbeddingBlob: TBytes;
-  SimilarityScores: TList<TPair<Single, string>>;  // Now using Single instead of Double
-  Score: Single;  // Changed to Single
-  I, VectorSize: Integer;
-  JSONObject: TJSONObject;
-  JSONPairID, JSONPairScore: TJSONPair;
+  LWords: TArray<string>;
+  LChunkText: string;
+  LStartIdx, LEndIdx, LChunkCounter: Integer;
 begin
-  QueryEmbedding := FEmbeddings.Generate(AQuery);
-  SimilarityScores := TList<TPair<Single, string>>.Create;
-  Result := TJSONArray.Create;
+  Result := False;
 
-  try
-    FDatabase.ClearSQLText;
-    FDatabase.SetMacro('table', 'vectors');
-    FDatabase.AddSQLText('SELECT id, text, embedding FROM &table');
+  LWords := AText.Split([' ']);  // Split text into words
+  LChunkCounter := 1;
 
-    if not FDatabase.Execute then
+  LStartIdx := 0;
+  while LStartIdx < Length(LWords) do
+  begin
+    LEndIdx := Min(LStartIdx + AChunkSize, Length(LWords));
+    LChunkText := String.Join(' ', Copy(LWords, LStartIdx, LEndIdx - LStartIdx));
+
+    // Add title to each chunk for better context
+    LChunkText := Format('[%s - Part %d] %s', [ATitle, LChunkCounter, LChunkText]);
+
+    // Store each chunk separately
+    if not AddDocument(Format('%s_chunk%d', [ADocID, LChunkCounter]), LChunkText) then
     begin
-      SimilarityScores.Free;
-      Result.Free;
-      Exit(nil);
+      SetError('Was not able to add chunk to database', []);
+      Exit;
     end;
-
-    for I := 0 to FDatabase.RecordCount - 1 do
-    begin
-      DocID := FDatabase.GetField(I, 'id');
-      TextData := FDatabase.GetField(I, 'text');
-
-      // Retrieve and decode Base64-encoded embedding
-      EncodedEmbedding := FDatabase.GetField(I, 'embedding');
-      EmbeddingBlob := TNetEncoding.Base64.DecodeStringToBytes(EncodedEmbedding);
-
-      // Convert byte array back to float array
-      VectorSize := Length(EmbeddingBlob) div SizeOf(Single);
-      SetLength(DBEmbedding, VectorSize);
-
-      if VectorSize > 0 then
-        Move(EmbeddingBlob[0], DBEmbedding[0], Length(EmbeddingBlob));
-
-      // Compute similarity
-      Score := CosineSimilarity(QueryEmbedding, DBEmbedding);
-
-      // Store similarity in a sortable list
-      SimilarityScores.Add(TPair<Single, string>.Create(Score, DocID));
-    end;
-
-    // Sort by similarity in descending order
-    SimilarityScores.Sort(
-      TComparer<TPair<Single, string>>.Construct(
-        function(const Left, Right: TPair<Single, string>): Integer
-        begin
-          Result := CompareValue(Right.Key, Left.Key);
-        end
-      )
-    );
-
-    // Add top results to JSON
-    for I := 0 to Min(ATopK - 1, SimilarityScores.Count - 1) do
-    begin
-      JSONObject := TJSONObject.Create;
-      try
-        JSONPairID := TJSONPair.Create('id', TJSONString.Create(SimilarityScores[I].Value));
-        JSONPairScore := TJSONPair.Create('score', TJSONNumber.Create(SimilarityScores[I].Key));
-
-        JSONObject.AddPair(JSONPairID);
-        JSONObject.AddPair(JSONPairScore);
-        Result.AddElement(JSONObject);
-      except
-        raise;
-      end;
-    end;
-
-  finally
-    SimilarityScores.Free;
+    Inc(LChunkCounter);
+    LStartIdx := LEndIdx;
   end;
+
+  Result := True;
 end;
 
+function TsoVectorDatabase.Search(const AQuery: string; const ATopK: Integer = 5; const AQueryLimit: Integer = 1000): TJSONArray;
+var
+  LQueryEmbedding: TArray<Single>;
+  LDocID, LTextData, LEncodedEmbedding: string;
+  LDBEmbedding: TArray<Single>;
+  LEmbeddingBlob: TBytes;
+  LSimilarityScores: TDictionary<string, Single>;
+  LScore, LExistingScore: Single;
+  I, LVectorSize: Integer;
+  LJSONObject: TJSONObject;
+  LSortedScores: TList<TPair<string, Single>>;
+  LPair: TPair<string, Single>;
+begin
+  Result := TJSONArray.Create;  // Always return an empty array if no results
 
+  LQueryEmbedding := FEmbeddings.Generate(AQuery);
 
+  LSimilarityScores := TDictionary<string, Single>.Create;
+  try
+    LSortedScores := TList<TPair<string, Single>>.Create;
 
+    try
+      FDatabase.ClearSQLText;
+      FDatabase.SetMacro('table', 'vectors');
 
+      // Use ALimit to control the number of results fetched
+      FDatabase.AddSQLText('SELECT id, text, embedding FROM &table WHERE text LIKE :query LIMIT :limit');
+      FDatabase.SetParam('query', '%' + AQuery + '%');
+      FDatabase.SetParam('limit', IntToStr(AQueryLimit));
+
+      if not FDatabase.Execute then Exit;
+
+      for I := 0 to FDatabase.RecordCount - 1 do
+      begin
+        LDocID := FDatabase.GetField(I, 'id');
+        LTextData := FDatabase.GetField(I, 'text');
+
+        // Retrieve and decode Base64-encoded embedding
+        LEncodedEmbedding := FDatabase.GetField(I, 'embedding');
+        LEmbeddingBlob := TNetEncoding.Base64.DecodeStringToBytes(LEncodedEmbedding);
+
+        // Convert byte array back to float array
+        LVectorSize := Length(LEmbeddingBlob) div SizeOf(Single);
+        SetLength(LDBEmbedding, LVectorSize);
+        if LVectorSize > 0 then
+          Move(LEmbeddingBlob[0], LDBEmbedding[0], Length(LEmbeddingBlob));
+
+        // Compute similarity
+        LScore := CosineSimilarity(LQueryEmbedding, LDBEmbedding);
+
+        // Aggregate scores by document ID
+        if LSimilarityScores.TryGetValue(LDocID, LExistingScore) then
+          LSimilarityScores[LDocID] := Max(LExistingScore, LScore)
+        else
+          LSimilarityScores.Add(LDocID, LScore);
+      end;
+
+      // Sort results by similarity
+      for LPair in LSimilarityScores do
+        LSortedScores.Add(LPair);
+
+      LSortedScores.Sort(
+        TComparer<TPair<string, Single>>.Construct(
+          function(const Left, Right: TPair<string, Single>): Integer
+          begin
+            Result := CompareValue(Right.Value, Left.Value);
+          end
+        )
+      );
+
+      // Add top results to JSON
+      for I := 0 to Min(ATopK - 1, LSortedScores.Count - 1) do
+      begin
+        LJSONObject := TJSONObject.Create;
+        try
+          LJSONObject.AddPair('id', LSortedScores[I].Key);
+          LJSONObject.AddPair('score', TJSONNumber.Create(LSortedScores[I].Value));
+          Result.AddElement(LJSONObject);
+        except
+          LJSONObject.Free;
+          raise;
+        end;
+      end;
+    finally
+      LSortedScores.Free;
+    end;
+  finally
+    LSimilarityScores.Free;
+  end;
+end;
 
 end.

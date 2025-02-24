@@ -15,50 +15,77 @@
  See LICENSE file for license information
 ===============================================================================}
 
-(*
-  === USAGE NOTES ===
-   * Download model from:
-     - https://huggingface.co/tinybiggames/DeepHermes-3-Llama-3-8B-Preview-Q4_K_M-GGUF/resolve/main/deephermes-3-llama-3-8b-preview-q4_k_m.gguf?download=true
-   * Place in your desired location, the examples expect:
-     - C:/LLM/GGUF
+{
+  ===== USAGE NOTES =====
+  * Download model from:
+   - https://huggingface.co/tinybiggames/DeepHermes-3-Llama-3-8B-Preview-Q4_K_M-GGUF/resolve/main/deephermes-3-llama-3-8b-preview-q4_k_m.gguf?download=true
+  * Place in your desired location, the examples expect:
+   - C:/LLM/GGUF
 
-   * Get search api key from:
-     - https://tavily.com/
-     - You get 1000 free tokens per month
-     - Create a an environment variable named "TAVILY_API_KEY" and set it to
-       the search api key.
+  * Converting Models to GGUF Format:
+   - You can convert a model to the GGUF format using an online converter
+     available at Hugging Face Spaces
+     (https://huggingface.co/spaces/ggml-org/gguf-my-repo).
+     Note that you need a Hugging Face account, as the converted model will
+     be saved to your account.
 
-   * Explanation of SQL Static Macros (&text) and Dynamic Parameters (:text):
-     1. SQL Static Macros (&text):
-        - Purpose: Static macros are placeholders in your SQL query that are
-          replaced with fixed values or strings at the time the SQL text is
-          prepared.
-        - How it works: When you use &text in your SQL statement, it acts as a
-          macro that is replaced with a specific value or table name before the
-          query is executed. This is typically used for SQL elements that don't
-          change per execution, like table names or field names.
-        - Example: If you have 'SELECT * FROM &table;' in your SQL text, and
-          you set &table to 'users', the final SQL executed would be
-          'SELECT * FROM users;'.
-        - Analogy: Think of it like a "find and replace" that happens before
-          the query runs.
+  * GPU Settings:
+   - Setting `MainGPU` to `-1` will automatically select the best GPU
+     available on your system.
+   - Alternatively, you can specify a GPU by setting `MainGPU` to `0 - N`
+     (where `N` is the GPU index).
+   - For `MaxGPULayers`:
+     - Setting it to `-1` will use all available layers on the GPU.
+     - Setting it to `0` will use the CPU only.
+     - Setting it to `1 - N` will offload a specific number of layers to the
+       GPU.
 
-     2. SQL Dynamic Parameters (:text):
-        - Purpose: Dynamic parameters are used to securely insert variable data
-          into SQL queries at runtime. They are typically used for values that
-          can change, such as user input or variable data, and are often used
-          to prevent SQL injection.
-        - How it works: When you use :text in your SQL statement, it acts as a
-          placeholder that will be dynamically replaced with an actual value at
-          runtime. The value is passed separately from the SQL query, allowing
-          for secure and flexible data handling.
-        - Example: If you have 'SELECT * FROM users WHERE id = :userId;' in
-          your SQL text, and you bind :userId to the value '42', the final SQL
-          executed would be 'SELECT * FROM users WHERE id = 42;'.
-        - Analogy: Think of it as a variable that gets its value just before
-          the SQL query is run, making it possible to execute the same query
-          with different data multiple times.
-*)
+  * Customizing Output:
+   - You can configure various callbacks to control the model's output
+     according to your needs.
+
+  * Optimized for Local Inference:
+   - Sophora is designed for efficient local inference on consumer-grade
+     hardware. Using a 4-bit quantized model ensures fast loading and
+     performance on modern consumer GPUs.
+
+  * Get search api key from:
+   - https://tavily.com/
+   - You get 1000 free tokens per month
+   - Create a an environment variable named "TAVILY_API_KEY" and set it to
+     the search api key.
+
+  * Explanation of SQL Static Macros (&text) and Dynamic Parameters (:text):
+   1. SQL Static Macros (&text):
+      - Purpose: Static macros are placeholders in your SQL query that are
+        replaced with fixed values or strings at the time the SQL text is
+        prepared.
+      - How it works: When you use &text in your SQL statement, it acts as a
+        macro that is replaced with a specific value or table name before the
+        query is executed. This is typically used for SQL elements that don't
+        change per execution, like table names or field names.
+      - Example: If you have 'SELECT * FROM &table;' in your SQL text, and
+        you set &table to 'users', the final SQL executed would be
+        'SELECT * FROM users;'.
+      - Analogy: Think of it like a "find and replace" that happens before
+        the query runs.
+
+   2. SQL Dynamic Parameters (:text):
+      - Purpose: Dynamic parameters are used to securely insert variable data
+        into SQL queries at runtime. They are typically used for values that
+        can change, such as user input or variable data, and are often used
+        to prevent SQL injection.
+      - How it works: When you use :text in your SQL statement, it acts as a
+        placeholder that will be dynamically replaced with an actual value at
+        runtime. The value is passed separately from the SQL query, allowing
+        for secure and flexible data handling.
+      - Example: If you have 'SELECT * FROM users WHERE id = :userId;' in
+        your SQL text, and you bind :userId to the value '42', the final SQL
+        executed would be 'SELECT * FROM users WHERE id = 42;'.
+      - Analogy: Think of it as a variable that gets its value just before
+        the SQL query is run, making it possible to execute the same query
+        with different data multiple times.
+}
 
 unit UTestbed;
 
@@ -211,7 +238,7 @@ begin
     LMsg.Add(soUser, 'I walk on four legs in the morning, two legs at noon, and three legs in the evening. But beware, for this is not the famous riddle of the Sphinx. Instead, my journey is cyclical, and each stage is both an end and a beginning. I am not a creature, but I hold the essence of all creatures within me. What am I?');
 
     // Print the user question with formatting
-    soConsole.PrintLn('Question: %s%s' + soCRLF, [soCSIFGCyan + soCRLF, LMsg.LastUser()]);
+    soConsole.PrintLn('Question: %s%s' + soCRLF, [soCSIFGCyan + soCRLF, soConsole.WrapTextEx(LMsg.LastUser(), 120-10)]);
 
     // Print response header
     soConsole.PrintLn('Response:');
@@ -435,6 +462,7 @@ var
   // Column width variables for formatting the output table
   LQueryColWidth, LDocColWidth, LScoreColWidth: Integer;
   LRankColWidth, LLineWidth: Integer;
+
 begin
   // Create an instance of the vector database
   LVectorDB := TsoVectorDatabase.Create();
@@ -492,7 +520,7 @@ begin
     for I := 0 to High(LQueries) do
     begin
       // Search the vector database for the top 3 most relevant documents
-      LSearchResults := LVectorDB.Search(LQueries[I], 3);
+      LSearchResults := LVectorDB.Search(LQueries[I], 1);
 
       if Assigned(LSearchResults) then
       begin
@@ -520,7 +548,6 @@ begin
     // Free allocated resources to prevent memory leaks
     LVectorDB.Free();
   end;
-
 end;
 
 
@@ -541,7 +568,7 @@ begin
   soConsole.PrintLn(soCSIFGMagenta + 'Sophora v%s' + soCRLF, [CsoSophoraVersion]);
 
   // Set the test number to execute
-  LNum := 05;
+  LNum := 01;
 
   // Execute the corresponding test based on the selected test number
   case LNum of

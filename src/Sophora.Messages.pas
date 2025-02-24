@@ -62,6 +62,7 @@ constructor TsoMessages.Create();
 begin
   inherited;
   FList := TStringList.Create();
+  Clear();
 end;
 
 destructor TsoMessages.Destroy();
