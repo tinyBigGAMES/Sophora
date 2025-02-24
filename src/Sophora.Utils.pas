@@ -635,6 +635,8 @@ var
   Url: string;
 begin
   Result := '';
+  if AAPIKey.IsEmpty then Exit;
+
   HttpClient := THTTPClient.Create;
   try
     // Set the API URL
@@ -650,7 +652,7 @@ begin
       JsonRequest.AddPair('include_images', TJSONBool.Create(False));
       JsonRequest.AddPair('include_image_descriptions', TJSONBool.Create(False));
       JsonRequest.AddPair('include_raw_content', TJSONBool.Create(False));
-      JsonRequest.AddPair('max_results', TJSONNumber.Create(5));
+      JsonRequest.AddPair('max_results', TJSONNumber.Create(1));
       JsonRequest.AddPair('include_domains', TJSONArray.Create); // Empty array
       JsonRequest.AddPair('exclude_domains', TJSONArray.Create); // Empty array
 

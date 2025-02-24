@@ -31,7 +31,8 @@ uses
   Sophora.Inference in '..\..\src\Sophora.Inference.pas',
   Sophora.Messages in '..\..\src\Sophora.Messages.pas',
   UTestbed in 'UTestbed.pas',
-  Sophora.RAG in '..\..\src\Sophora.RAG.pas';
+  Sophora.RAG in '..\..\src\Sophora.RAG.pas',
+  Sophora.Tools in '..\..\src\Sophora.Tools.pas';
 
 begin
   try

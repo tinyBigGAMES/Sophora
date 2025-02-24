@@ -125,6 +125,7 @@
         <DCCReference Include="..\..\src\Sophora.Messages.pas"/>
         <DCCReference Include="UTestbed.pas"/>
         <DCCReference Include="..\..\src\Sophora.RAG.pas"/>
+        <DCCReference Include="..\..\src\Sophora.Tools.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
@@ -174,9 +175,9 @@
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>
-                <DeployFile LocalName="..\..\bin\Testbed.rsm" Configuration="Debug" Class="DebugSymbols">
+                <DeployFile LocalName="..\..\bin\Testbed.exe" Configuration="Release" Class="ProjectOutput">
                     <Platform Name="Win64">
-                        <RemoteName>Testbed.rsm</RemoteName>
+                        <RemoteName>Testbed.exe</RemoteName>
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>

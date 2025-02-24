@@ -34,8 +34,6 @@ uses
 const
   CsoSophoraVersion  = '0.1.0';
 
-  CsoTavilyApiKeyEnvVar = 'TAVILY_API_KEY';
-
   CsoDefaultModelPath  = 'C:/LLM/GGUF';
 
   CsoGeneralLLMFilename = 'deephermes-3-llama-3-8b-preview-q4_k_m.gguf';

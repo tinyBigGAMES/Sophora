@@ -624,6 +624,8 @@ var
   LSize: Integer;
 begin
   Result := False;
+  if ADocID.IsEmpty then Exit;
+  if AText.IsEmpty then Exit;
 
   LEmbedding := FEmbeddings.Generate(AText);
   LSize := Length(LEmbedding) * SizeOf(Single);

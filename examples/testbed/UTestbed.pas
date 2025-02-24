@@ -101,6 +101,7 @@ uses
   Sophora.Console,
   Sophora.Messages,
   Sophora.Inference,
+  Sophora.Tools,
   Sophora.RAG;
 
 procedure RunTests();
@@ -137,6 +138,9 @@ var
   // Represents the speed of token generation (tokens per second)
   LTokenSpeed: Single;
 begin
+  // Set console title
+  soConsole.SetTitle('Sophora: Non-Thinking Mode');
+
   // Create instances of message handler and inference engine
   LMsg := TsoMessages.Create();
   LInf := TsoInference.Create();
@@ -220,6 +224,9 @@ var
   // Represents the speed of token generation (tokens per second)
   LTokenSpeed: Single;
 begin
+  // Set console title
+  soConsole.SetTitle('Sophora: Thinking Mode');
+
   // Create instances of message handler and inference engine
   LMsg := TsoMessages.Create();
   LInf := TsoInference.Create();
@@ -303,6 +310,9 @@ var
   // Formatting variable for comma separation in output
   LComma: string;
 begin
+  // Set console title
+  soConsole.SetTitle('Sophora: Embeddings');
+
   // Create an instance of the embedding engine
   LEmb := TsoEmbeddings.Create();
 
@@ -388,6 +398,9 @@ var
   // Database object for handling SQLite operations
   LDb: TsoDatabase;
 begin
+  // Set console title
+  soConsole.SetTitle('Sophora: Database');
+
   // Create an instance of the database engine
   LDb := TsoDatabase.Create();
 
@@ -479,6 +492,9 @@ var
   LRankColWidth, LLineWidth: Integer;
 
 begin
+  // Set console title
+  soConsole.SetTitle('Sophora: Vector Database');
+
   // Create an instance of the embedding engine
   LEmb := TsoEmbeddings.Create();
 
@@ -581,6 +597,67 @@ end;
 
 
 {
+  This example demonstrates how to use web search for retrieving real-time,
+  up-to-date information. It utilizes the `TsoWebSearch` class to perform
+  a live query and fetch the latest data from the web.
+
+  The procedure performs the following steps:
+  1. Initializes the web search engine.
+  2. Defines a query to search.
+  3. Sends the query to the web search engine.
+  4. Displays the response if successful; otherwise, prints an error message.
+
+  NOTE: You have your Tavily account set up, obtained a search API key, and
+        set up and assign the search key environment variable,
+        "TAVILY_API_KEY".
+}
+procedure Test06();
+var
+  // Web search engine for real-time information retrieval
+  LWebSearch: TsoWebSearch;
+
+  // The question to be searched on the web
+  LQuestion: string;
+begin
+  // Set the console title for the search test
+  soConsole.SetTitle('Sophora: WebSearch');
+
+  // Create an instance of the web search component
+  LWebSearch := TsoWebSearch.Create();
+
+  try
+    // Define the search query
+    //LQuestion := 'What is Bill Gates'' current net worth as of 2025?';
+    LQuestion := 'What is the current U.S. national debt as of 2025?';
+
+    // Print the query in cyan for visibility
+    soConsole.PrintLn('Query:');
+    soConsole.PrintLn(soCSIFGCyan + LQuestion);
+
+    // Print a separator before displaying the web search response
+    soConsole.PrintLn();
+    soConsole.PrintLn('Web search response:');
+
+    // Execute the web search query and check for success
+    if LWebSearch.Query(LQuestion) then
+    begin
+      // Print the response in green if the search is successful
+      soConsole.PrintLn(soCSIFGGreen + soConsole.WrapTextEx(LWebSearch.Response(), 120-10));
+    end
+    else
+    begin
+      // Print the error message in red if the search fails
+      soConsole.PrintLn(soCSIFGRed + LWebSearch.GetError());
+    end;
+
+  finally
+    // Free the allocated web search object to prevent memory leaks
+    LWebSearch.Free();
+  end;
+end;
+
+
+{
   This procedure serves as a test harness for running different test cases
   related to the Large Language Model (LLM) functionalities, such as
   non-thinking mode, deep-thinking mode, and embedding generation.
@@ -606,6 +683,7 @@ begin
     03: Test03();  // Runs the embedding generation test
     04: Test04();  // Runs the sqlite database test
     05: Test05();  // Runs the vector database test
+    06: Test06();  // Runes the web search test
   end;
 
   // Pause execution to allow viewing the console output before exiting
