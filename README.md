@@ -53,8 +53,8 @@ LMsg := TsoMessages.Create();
 LInf := TsoInference.Create();
 if not LInf.LoadModel() then Exit;
 LMsg.Add(soUser, 'Who is Bill Gates?');
-if LInf.Run(LMsg) then
-  soConsole.PrintLn(LMsg.LastAI());
+if not LInf.Run(LMsg) then
+  soConsole.PrintLn(LInf.GetError());
 ```
 
 ### 🔹 Deep Thinking Mode
@@ -102,11 +102,9 @@ Sophora provides **detailed performance tracking**:
 ### ✅ Example Performance Output:
 ```plaintext
 Performance:
-Input : 45 tokens
-Output: 76 tokens
-Speed : 28.3 tokens/sec
-Memory : 4.5 GB used
-Latency : 320 ms
+Input : 15 tokens
+Output: 156 tokens
+Speed : 49.68 tokens/sec
 ```
 
 ## ⚠️ Repository Status
