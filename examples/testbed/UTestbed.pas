@@ -451,6 +451,10 @@ end;
 }
 procedure Test05();
 var
+  // Represents the embedding engine responsible for generating vector
+  // representations
+  LEmb: TsoEmbeddings;
+
   // Object representing the vector database
   LVectorDB: TsoVectorDatabase;
 
@@ -475,92 +479,103 @@ var
   LRankColWidth, LLineWidth: Integer;
 
 begin
-  // Create an instance of the vector database
-  LVectorDB := TsoVectorDatabase.Create();
+  // Create an instance of the embedding engine
+  LEmb := TsoEmbeddings.Create();
 
   try
     // Set model path
-    LVectorDB.SetModelPath(CModelPath);
+    LEmb.SetModelPath(CModelPath);
 
-    // Open the vector database; exit if it fails
-    if not LVectorDB.Open('vectors.db') then Exit;
+    // Load embeddings model on the CPU
+    if not LEmb.LoadModel(0, 0) then Exit;
 
-    // Add sample documents to the vector database
-    soConsole.PrintLn('Adding documents...');
-    LVectorDB.AddDocument('doc1', 'This is an example document.');
-    LVectorDB.AddDocument('doc2', 'Another piece of text related to AI.');
-    LVectorDB.AddDocument('doc3', 'This document is about machine learning and AI.');
+    // Create an instance of the vector database
+    LVectorDB := TsoVectorDatabase.Create();
 
-    // Define test queries
-    SetLength(LQueries, 17);
-    LQueries[0] := 'AI';
-    LQueries[1] := 'machine learning';
-    LQueries[2] := 'document';
-    LQueries[3] := 'example';
-    LQueries[4] := 'related to AI';
+    try
+      // Open the vector database; exit if it fails
+      if not LVectorDB.Open(LEmb, 'vectors.db') then Exit;
 
-    // Concept-Based Queries
-    LQueries[5] := 'Neural networks';
-    LQueries[6] := 'Deep learning techniques';
-    LQueries[7] := 'Artificial intelligence advancements';
-    LQueries[8] := 'Text similarity in AI';
-    LQueries[9] := 'Training large language models';
+      // Add sample documents to the vector database
+      soConsole.PrintLn('Adding documents...');
+      LVectorDB.AddDocument('doc1', 'This is an example document.');
+      LVectorDB.AddDocument('doc2', 'Another piece of text related to AI.');
+      LVectorDB.AddDocument('doc3', 'This document is about machine learning and AI.');
 
-    // Reworded Queries (Synonyms)
-    LQueries[10] := 'intelligent algorithms';
-    LQueries[11] := 'automated learning';
-    LQueries[12] := 'document text';
-    LQueries[13] := 'a file related to artificial intelligence';
+      // Define test queries
+      SetLength(LQueries, 17);
+      LQueries[0] := 'AI';
+      LQueries[1] := 'machine learning';
+      LQueries[2] := 'document';
+      LQueries[3] := 'example';
+      LQueries[4] := 'related to AI';
 
-    // Long, Natural Language Queries (RAG-style)
-    LQueries[14] := 'What is the relationship between AI and machine learning?';
-    LQueries[15] := 'Can you summarize a document related to AI?';
-    LQueries[16] := 'Retrieve documents discussing AI-related topics';
+      // Concept-Based Queries
+      LQueries[5] := 'Neural networks';
+      LQueries[6] := 'Deep learning techniques';
+      LQueries[7] := 'Artificial intelligence advancements';
+      LQueries[8] := 'Text similarity in AI';
+      LQueries[9] := 'Training large language models';
 
-    // Set column widths for table formatting
-    LQueryColWidth := 45;  // Adjust based on longest query
-    LRankColWidth := 6;
-    LDocColWidth := 10;
-    LScoreColWidth := 10;
-    LLineWidth := LQueryColWidth + LRankColWidth + LDocColWidth + LScoreColWidth + 10;
+      // Reworded Queries (Synonyms)
+      LQueries[10] := 'intelligent algorithms';
+      LQueries[11] := 'automated learning';
+      LQueries[12] := 'document text';
+      LQueries[13] := 'a file related to artificial intelligence';
 
-    // Print Table Header
-    soConsole.PrintLn(StringOfChar('-', LLineWidth));
-    soConsole.PrintLn(Format('| %-*s | %-*s | %-*s | %-*s |',
-      [LQueryColWidth, 'Query', LRankColWidth, 'Rank', LDocColWidth, 'Document', LScoreColWidth, 'Score']));
-    soConsole.PrintLn(StringOfChar('-', LLineWidth));
+      // Long, Natural Language Queries (RAG-style)
+      LQueries[14] := 'What is the relationship between AI and machine learning?';
+      LQueries[15] := 'Can you summarize a document related to AI?';
+      LQueries[16] := 'Retrieve documents discussing AI-related topics';
 
-    // Execute each test query and display the results
-    for I := 0 to High(LQueries) do
-    begin
-      // Search the vector database for the top 3 most relevant documents
-      LSearchResults := LVectorDB.Search(LQueries[I], 1);
+      // Set column widths for table formatting
+      LQueryColWidth := 45;  // Adjust based on longest query
+      LRankColWidth := 6;
+      LDocColWidth := 10;
+      LScoreColWidth := 10;
+      LLineWidth := LQueryColWidth + LRankColWidth + LDocColWidth + LScoreColWidth + 10;
 
-      if Assigned(LSearchResults) then
+      // Print Table Header
+      soConsole.PrintLn(StringOfChar('-', LLineWidth));
+      soConsole.PrintLn(Format('| %-*s | %-*s | %-*s | %-*s |',
+        [LQueryColWidth, 'Query', LRankColWidth, 'Rank', LDocColWidth, 'Document', LScoreColWidth, 'Score']));
+      soConsole.PrintLn(StringOfChar('-', LLineWidth));
+
+      // Execute each test query and display the results
+      for I := 0 to High(LQueries) do
       begin
-        for J := 0 to LSearchResults.Count - 1 do
-        begin
-          // Extract document ID and similarity score from the search result
-          LSearchResultObj := LSearchResults.Items[J] as TJSONObject;
-          LDocID := LSearchResultObj.GetValue('id').Value;
-          LScore := (LSearchResultObj.GetValue('score') as TJSONNumber).AsDouble;
+        // Search the vector database for the top 3 most relevant documents
+        LSearchResults := LVectorDB.Search(LQueries[I], 1);
 
-          // Print formatted table row
-          soConsole.PrintLn(Format('| %-*s | %-*d | %-*s | %-*.6f |',
-            [LQueryColWidth, LQueries[I], LRankColWidth, J + 1, LDocColWidth, LDocID, LScoreColWidth, LScore]));
+        if Assigned(LSearchResults) then
+        begin
+          for J := 0 to LSearchResults.Count - 1 do
+          begin
+            // Extract document ID and similarity score from the search result
+            LSearchResultObj := LSearchResults.Items[J] as TJSONObject;
+            LDocID := LSearchResultObj.GetValue('id').Value;
+            LScore := (LSearchResultObj.GetValue('score') as TJSONNumber).AsDouble;
+
+            // Print formatted table row
+            soConsole.PrintLn(Format('| %-*s | %-*d | %-*s | %-*.6f |',
+              [LQueryColWidth, LQueries[I], LRankColWidth, J + 1, LDocColWidth, LDocID, LScoreColWidth, LScore]));
+          end;
+
+          // Free the search result JSON array after processing
+          LSearchResults.Free();
         end;
 
-        // Free the search result JSON array after processing
-        LSearchResults.Free();
+        // Print table row separator after processing each query
+        soConsole.PrintLn(StringOfChar('-', LLineWidth));
       end;
 
-      // Print table row separator after processing each query
-      soConsole.PrintLn(StringOfChar('-', LLineWidth));
+    finally
+      // Close/Free vector database
+      LVectorDB.Free();
     end;
-
   finally
-    // Free allocated resources to prevent memory leaks
-    LVectorDB.Free();
+    // Close/Free embeddings engine
+    LEmb.Free();
   end;
 end;
 

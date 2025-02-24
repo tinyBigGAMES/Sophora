@@ -94,17 +94,15 @@ type
   { TsoVectorDatabase }
   TsoVectorDatabase = class(TsoBaseObject)
   private
-    FEmbeddings: TsoEmbeddings;
     FDatabase: TsoDatabase;
+    FEmbeddings: TsoEmbeddings;
     procedure CreateTableIfNotExists();
     function CosineSimilarity(const AVec1, AVec2: TArray<Single>): Double;
   public
     constructor Create(); override;
     destructor Destroy; override;
 
-    function  GetModelPath(): string;
-    procedure SetModelPath(const APath: string=CsoDefaultModelPath);
-    function Open(const AFilename: string; const AMainGPU: Integer=0; const AGPULayers: Integer=0): Boolean;
+    function Open(const AEmbeddings: TsoEmbeddings; const AFilename: string; const AMainGPU: Integer=0; const AGPULayers: Integer=0): Boolean;
     procedure Close();
     function AddDocument(const ADocID: string; const AText: string): Boolean;
     function AddLargeDocument(const ADocID, ATitle, AText: string; const AChunkSize: Integer): Boolean;
@@ -546,9 +544,7 @@ end;
 constructor TsoVectorDatabase.Create();
 begin
   inherited;
-  FEmbeddings := TsoEmbeddings.Create;
   FDatabase := TsoDatabase.Create;
-  SetModelPath(); // set default model path
 end;
 
 destructor TsoVectorDatabase.Destroy();
@@ -556,26 +552,16 @@ begin
   Close();
 
   FDatabase.Free();
-  FEmbeddings.Free();
 
   inherited;
 end;
 
-function  TsoVectorDatabase.GetModelPath(): string;
-begin
-  Result := FEmbeddings.GetModelPath();
-end;
-
-procedure TsoVectorDatabase.SetModelPath(const APath: string);
-begin
-  FEmbeddings.SetModelPath(APath);
-end;
-
-function TsoVectorDatabase.Open(const AFilename: string; const AMainGPU: Integer; const AGPULayers: Integer): Boolean;
+function TsoVectorDatabase.Open(const AEmbeddings: TsoEmbeddings; const AFilename: string; const AMainGPU: Integer; const AGPULayers: Integer): Boolean;
 begin
   Result := False;
+  if not Assigned(AEmbeddings) then Exit;
+  FEmbeddings := AEmbeddings;
 
-  if not FEmbeddings.LoadModel(AMainGPU, AGPULayers) then Exit;
   if not FDatabase.Open(AFilename) then Exit;
 
   CreateTableIfNotExists();
@@ -586,7 +572,6 @@ end;
 procedure TsoVectorDatabase.Close();
 begin
   FDatabase.Close();
-  FEmbeddings.UnloadModel();
 end;
 
 procedure TsoVectorDatabase.CreateTableIfNotExists();
@@ -638,6 +623,8 @@ var
   LEncodedEmbedding: string;
   LSize: Integer;
 begin
+  Result := False;
+
   LEmbedding := FEmbeddings.Generate(AText);
   LSize := Length(LEmbedding) * SizeOf(Single);
   SetLength(LEmbeddingBlob, LSize);

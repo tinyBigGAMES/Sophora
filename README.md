@@ -2,7 +2,7 @@
 [![Chat on Discord](https://img.shields.io/discord/754884471324672040?style=for-the-badge)](https://discord.gg/tPWjMwK)
 [![Follow on Bluesky](https://img.shields.io/badge/Bluesky-tinyBigGAMES-blue?style=for-the-badge&logo=bluesky)](https://bsky.app/profile/tinybiggames.com)  
 
-**Sophora** is a local generative AI toolkit for **Delphi**, powered by the **DeepHermes-3** model and the latest **llama.cpp** optimizations. It enables fast, efficient, and unified reasoning, making it ideal for AI-driven applications that require **high-performance local inference** without relying on external cloud services. With features like **function calling**, **embedding generation**, **retrieval-augmented generation (RAG)**, and deep inference capabilities, Sophora provides developers with a versatile and powerful toolset for integrating AI into their Delphi projects. By supporting **optimized execution on modern hardware**, including **compute capability 5.0+ GPUs** and **Vulkan acceleration**, it ensures smooth and efficient model operation even on resource-constrained systems.
+**Sophora** is a local generative AI toolkit for **Delphi**, powered by the **DeepHermes-3** model and the latest **llama.cpp** optimizations. It enables fast, efficient, and unified reasoning, making it ideal for AI-driven applications that require **high-performance local inference** without relying on external cloud services. With features like **function calling**, **embedding generation**, **retrieval-augmented generation (RAG)**, and deep inference capabilities, Sophora provides developers with a versatile and powerful toolset for integrating AI into their Delphi projects. By supporting **optimized execution on modern hardware**, including **compute capability 5.0+ GPUs** via **Vulkan** for acceleration, it ensures smooth and efficient model operations.
 
 ## 🚀 Key Features
 - **Local AI Inference**: Run **DeepHermes-3** (Llama 3-based) entirely on your machine, enabling fully offline AI capabilities.
@@ -23,7 +23,7 @@ Get the latest version of Sophora and set up the toolkit:
   git clone https://github.com/tinyBigGAMES/Sophora.git
   ```
 - Extract the contents to your preferred directory.
-- Open the project in **Delphi**, and run the provided examples to explore the toolkit. Be sure to reference the **Usage Notes** in UTestbed.pas for insights about setup and using the toolkit.
+- Open the project in **Delphi**, and run the provided examples to explore the toolkit. Be sure to reference the **Usage Notes** in `UTestbed.pas` for insights about setup and using the toolkit.
 - Ensure your system meets the minimum requirements for running large language models efficiently. Your device will need enough RAM/VRAM to hold the model plus context. Your GPU must have compute capability 5.0+ and support Vulkan for acceleration.
 
 ### 2️⃣ Download the Model
@@ -37,12 +37,12 @@ Sophora requires **DeepHermes-3**, which can be downloaded from **Hugging Face**
 ### 3️⃣ Setup Search API (Optional)
 To enable web-augmented search capabilities, obtain an API key from [Tavily](https://tavily.com/).
 
-- You receive **1000 free tokens per month**.
+- You receive **1000 free API credits per month**.
 - Set an environment variable:
   ```sh
-  export TAVILY_API_KEY="your_api_key_here"
+  TAVILY_API_KEY="your_api_key_here"
   ```
-- This API can be used for enhanced external queries when needed.
+- This API can be used for enhanced external queries via tool calls when needed.
 
 ## 🛠️ Usage Examples
 
