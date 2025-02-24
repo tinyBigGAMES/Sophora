@@ -9,5 +9,5 @@ files as a false positive. We appreciate your understanding and encourage you
 to review the VirusTotal report for your assurance. Should you have any
 concerns or reservations, please do not hesitate to reach out to us.
 
-AIToolkit.CLibs.res - https://www.virustotal.com/gui/file/c91dedceace46563abd7189e73e36fd181d8b0434b4f276c7eb79a43a8409307
+Sophora.CLibs.res - https://www.virustotal.com/gui/file/c91dedceace46563abd7189e73e36fd181d8b0434b4f276c7eb79a43a8409307
 
