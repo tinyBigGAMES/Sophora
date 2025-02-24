@@ -107,6 +107,8 @@ procedure RunTests();
 
 implementation
 
+const
+  CModelPath = 'C:/LLM/GGUF';
 
 {
   This example demonstrates how to utilize DeepHermesLarge Language Model (LLM)
@@ -140,8 +142,8 @@ begin
   LInf := TsoInference.Create();
 
   try
-    // If model path is not "C:/LLM/GGUF" then uncomment and change it
-    //LInf.SetModelPath('PATH_TO_MODEL');
+    // Set model path
+    LInf.SetModelPath(CModelPath);
 
     // Load the LLM model; exit if loading fails
     if not LInf.LoadModel() then Exit;
@@ -223,8 +225,8 @@ begin
   LInf := TsoInference.Create();
 
   try
-    // If model path is not "C:/LLM/GGUF" then uncomment and change it
-    //LInf.SetModelPath('PATH_TO_MODEL');
+    // Set model path
+    LInf.SetModelPath(CModelPath);
 
     // Load the LLM model; exit if loading fails
     if not LInf.LoadModel() then Exit;
@@ -305,8 +307,8 @@ begin
   LEmb := TsoEmbeddings.Create();
 
   try
-    // If model path is not "C:/LLM/GGUF" then uncomment and change it
-    //LEmb.SetModelPath('PATH_TO_MODEL');
+    // Set model path
+    LEmb.SetModelPath(CModelPath);
 
     // Load the embedding model; exit if loading fails
     if not LEmb.LoadModel() then Exit;
@@ -477,8 +479,8 @@ begin
   LVectorDB := TsoVectorDatabase.Create();
 
   try
-    // If model path is not "C:/LLM/GGUF" then uncomment and change it
-    //LVectorDB.SetModelPath('PATH_TO_MODEL');
+    // Set model path
+    LVectorDB.SetModelPath(CModelPath);
 
     // Open the vector database; exit if it fails
     if not LVectorDB.Open('vectors.db') then Exit;
