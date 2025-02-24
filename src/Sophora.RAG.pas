@@ -102,6 +102,8 @@ type
     constructor Create(); override;
     destructor Destroy; override;
 
+    function  GetModelPath(): string;
+    procedure SetModelPath(const APath: string=CsoDefaultModelPath);
     function Open(const AFilename: string; const AMainGPU: Integer=0; const AGPULayers: Integer=0): Boolean;
     procedure Close();
     function AddDocument(const ADocID: string; const AText: string): Boolean;
@@ -546,6 +548,7 @@ begin
   inherited;
   FEmbeddings := TsoEmbeddings.Create;
   FDatabase := TsoDatabase.Create;
+  SetModelPath(); // set default model path
 end;
 
 destructor TsoVectorDatabase.Destroy();
@@ -556,6 +559,16 @@ begin
   FEmbeddings.Free();
 
   inherited;
+end;
+
+function  TsoVectorDatabase.GetModelPath(): string;
+begin
+  Result := FEmbeddings.GetModelPath();
+end;
+
+procedure TsoVectorDatabase.SetModelPath(const APath: string);
+begin
+  FEmbeddings.SetModelPath(APath);
 end;
 
 function TsoVectorDatabase.Open(const AFilename: string; const AMainGPU: Integer; const AGPULayers: Integer): Boolean;
