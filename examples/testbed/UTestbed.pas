@@ -622,7 +622,7 @@ begin
   // Set the console title for the search test
   soConsole.SetTitle('Sophora: WebSearch');
 
-  // Create an instance of the web search component
+  // Create an instance of the web search class
   LWebSearch := TsoWebSearch.Create();
 
   try
@@ -656,6 +656,54 @@ begin
   end;
 end;
 
+{
+  This example demonstrates how to use the prompt database in Sophora to retrieve predefined prompts.
+  The procedure performs the following steps:
+
+  1. Initializes the prompt database class.
+  2. Loads a list of prompts from a text file (`prompts.txt`).
+  3. Retrieves a specific prompt using its unique ID (`DeepThink`).
+  4. Displays the prompt's ID, description, and content with formatted output.
+
+  This functionality is useful for managing reusable prompts in AI applications.
+}
+procedure Test07();
+const
+  // The ID of the prompt to retrieve from the database
+  CPromptID = 'DeepThink';
+var
+  // Object for handling the prompt database
+  LPromptDb: TsoPromptDatabase;
+
+  // Object to store the retrieved prompt data
+  LPrompt: TsoPrompt;
+begin
+  // Set the console title for the prompt database test
+  soConsole.SetTitle('Sophora: Prompt Database');
+
+  // Create an instance of the prompt database
+  LPromptDb := TsoPromptDatabase.Create();
+
+  try
+    // Load prompts from the specified file; proceed only if successful
+    if LPromptDb.LoadFromFile('prompts.txt') then
+    begin
+      // Retrieve the prompt with the specified ID
+      if LPromptDb.GetPrompt(CPromptID, LPrompt) then
+      begin
+        // Print the prompt details in green for readability
+        soConsole.PrintLn('ID         : %s%s', [soCSIFGGreen, LPrompt.ID]);
+        soConsole.PrintLn('Description: %s%s', [soCSIFGGreen, LPrompt.Description]);
+        soConsole.PrintLn('Prompt     : ' + soCRLF + soCSIFGGreen + '%s',
+          [soConsole.WrapTextEx(LPrompt.Prompt, 120-10)]);
+      end;
+    end;
+  finally
+    // Free allocated resources to prevent memory leaks
+    LPromptDb.Free();
+  end;
+end;
+
 
 {
   This procedure serves as a test harness for running different test cases
@@ -683,7 +731,8 @@ begin
     03: Test03();  // Runs the embedding generation test
     04: Test04();  // Runs the sqlite database test
     05: Test05();  // Runs the vector database test
-    06: Test06();  // Runes the web search test
+    06: Test06();  // Runs the web search test
+    07: Test07();  // Runs the prompt database test
   end;
 
   // Pause execution to allow viewing the console output before exiting
