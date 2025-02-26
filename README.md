@@ -115,6 +115,10 @@ Speed : 49.68 tokens/sec
 Discover in-depth discussions and insights about Sophora and its innovative features. 🚀✨
 
 
+https://github.com/user-attachments/assets/6e82bf55-34fc-4085-8f97-0e0faca50a47
+
+
+
 ## 🛠️ Support and Resources
 
 - 🐞 **Report issues** via the [Issue Tracker](https://github.com/tinyBigGAMES/Sophora/issues).
