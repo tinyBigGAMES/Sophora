@@ -68,9 +68,9 @@ LInf.Run(LMsg);
 ### 🔹 Embedding Generation
 Sophora supports **vector search** using LLM embeddings.
 ```delphi
-LEmb := TsoEmbeddings.Create();
-LEmb.LoadModel();
-LResult := LEmb.Generate('Explain data analysis in ML');
+LInf := TsoInference.Create();
+LInf.LoadModel();
+LResult := LInf.Embeddings('Explain data analysis in ML');
 ```
 
 ### 🔹 Retrieval-Augmented Generation (RAG)
@@ -85,10 +85,10 @@ LDb.ExecuteSQL('SELECT * FROM articles');
 ### 🔹 Vector Database Search
 Sophora supports **semantic search** over stored documents.
 ```delphi
-LEmb := TsoEmbeddings.Create();
-LEmb.LoadModel();
+LInf := TsoInference.Create();
+LInf.LoadModel();
 LVectorDB := TsoVectorDatabase.Create();
-LVectorDB.Open(LEmb, 'vectors.db');
+LVectorDB.Open(LInf, 'vectors.db');
 LVectorDB.AddDocument('doc1', 'AI and deep learning research.');
 LSearchResults := LVectorDB.Search('machine learning', 3);
 ```

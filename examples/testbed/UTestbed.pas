@@ -122,7 +122,7 @@ const
   CMaxContext       = 1024 * 8;
 
   // Toggle show "thinking" tokens on/off
-  CShowThinking = False;
+  CShowThinking = True;
 
 {
   This example demonstrates how to utilize DeepHermesLarge Language Model (LLM)
@@ -334,7 +334,7 @@ procedure Test03();
 var
   // Represents the embedding engine responsible for generating vector
   // representations
-  LEmb: TsoEmbeddings;
+  LInf: TsoInference;
 
   // Stores the resulting embedding vector (array of floating-point numbers)
   LResult: TArray<Single>;
@@ -352,14 +352,14 @@ begin
   soConsole.SetTitle('Sophora: Embeddings');
 
   // Create an instance of the embedding engine
-  LEmb := TsoEmbeddings.Create();
+  LInf := TsoInference.Create();
 
   try
     // Set model path
-    LEmb.SetModelPath(CModelPath);
+    LInf.SetModelPath(CModelPath);
 
     // Load the embedding model; exit if loading fails
-    if not LEmb.LoadModel() then Exit;
+    if not LInf.LoadModel() then Exit;
 
     // Define the text prompt to be embedded
     LPrompt := 'Explain how data analysis supports machine learning.';
@@ -368,7 +368,7 @@ begin
     soConsole.PrintLn('Prompt: %s%s' + soCRLF, [soCSIFGCyan + soCRLF, LPrompt]);
 
     // Generate the embedding vector from the given prompt
-    LResult := LEmb.Generate(LPrompt);
+    LResult := LInf.Embeddings(LPrompt);
 
     // Print the header for the embedding values
     soConsole.PrintLn('Embeddings:');
@@ -393,7 +393,7 @@ begin
 
   finally
     // Free allocated resources to avoid memory leaks
-    LEmb.Free();
+    LInf.Free();
   end;
 end;
 
@@ -504,7 +504,7 @@ procedure Test05();
 var
   // Represents the embedding engine responsible for generating vector
   // representations
-  LEmb: TsoEmbeddings;
+  LInf: TsoInference;
 
   // Object representing the vector database
   LVectorDB: TsoVectorDatabase;
@@ -534,21 +534,21 @@ begin
   soConsole.SetTitle('Sophora: Vector Database');
 
   // Create an instance of the embedding engine
-  LEmb := TsoEmbeddings.Create();
+  LInf := TsoInference.Create();
 
   try
     // Set model path
-    LEmb.SetModelPath(CModelPath);
+    LInf.SetModelPath(CModelPath);
 
     // Load embeddings model on the CPU
-    if not LEmb.LoadModel(0, 0) then Exit;
+    if not LInf.LoadModel(0, 0) then Exit;
 
     // Create an instance of the vector database
     LVectorDB := TsoVectorDatabase.Create();
 
     try
       // Open the vector database; exit if it fails
-      if not LVectorDB.Open(LEmb, 'vectors.db') then Exit;
+      if not LVectorDB.Open(LInf, 'vectors.db') then Exit;
 
       // Add sample documents to the vector database
       soConsole.PrintLn('Adding documents...');
@@ -629,7 +629,7 @@ begin
     end;
   finally
     // Close/Free embeddings engine
-    LEmb.Free();
+    LInf.Free();
   end;
 end;
 
