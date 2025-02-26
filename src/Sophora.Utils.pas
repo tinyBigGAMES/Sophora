@@ -28,6 +28,7 @@ uses
   System.DateUtils,
   System.StrUtils,
   System.Classes,
+  System.Math,
   System.JSON,
   System.TypInfo,
   System.Rtti,
@@ -84,11 +85,12 @@ type
     class function  SanitizeToJson(const aText: string): string; static;
     class function  GetJsonSchema(const AClass: TClass; const AMethodName: string): string; static;
     class function  GetJsonSchemas(AClass: TClass): string; static;
-    class function  CallStaticMethod(const AClass: TClass; const AMethodName: string; const Args: array of TValue): TValue;
+    class function  CallStaticMethod(const AClass: TClass; const AMethodName: string; const AArgs: array of TValue): TValue;
     class function  GetISO8601DateTime(): string;
     class function  GetISO8601DateTimeLocal(): string;
     class function  GetLocalDateTime(): string;
     class function  HasEnoughDiskSpace(const AFilePath: string; ARequiredSize: Int64): Boolean;
+    class function  GetRandomThinkingResult(): string;
     class function  TavilyWebSearch(const AAPIKey, AQuery: string): string; static;
   end;
 
@@ -504,7 +506,7 @@ begin
   end;
 end;
 
-class function soUtils.CallStaticMethod(const AClass: TClass; const AMethodName: string; const Args: array of TValue): TValue;
+class function soUtils.CallStaticMethod(const AClass: TClass; const AMethodName: string; const AArgs: array of TValue): TValue;
 var
   Context: TRttiContext;
   RttiType: TRttiType;
@@ -525,7 +527,7 @@ begin
       raise Exception.CreateFmt('Method "%s" is not a static class method.', [AMethodName]);
 
     // Invoke the method dynamically
-    Result := Method.Invoke(nil, Args);
+    Result := Method.Invoke(nil, AArgs);
   finally
     Context.Free;
   end;
@@ -624,6 +626,24 @@ begin
 
   if GetDiskFreeSpaceEx(PChar(LDrive), LFreeAvailable, LTotalSpace, @LTotalFree) then
     Result := LFreeAvailable >= ARequiredSize;
+end;
+
+class function soUtils.GetRandomThinkingResult(): string;
+const
+  CMessages: array[0..9] of string = (
+    'Here’s what I came up with:',
+    'This is what I found:',
+    'Here’s my answer:',
+    'Done! Here’s the result:',
+    'Here’s my response:',
+    'I’ve worked it out:',
+    'Processing complete. Here’s my output:',
+    'Here’s what I think:',
+    'After thinking it through, here’s my take:',
+    'Solution ready! Check this out:'
+  );
+begin
+  Result := CMessages[Random(Length(CMessages))];
 end;
 
 class function soUtils.TavilyWebSearch(const AAPIKey, AQuery: string): string;
@@ -905,6 +925,7 @@ end;
 initialization
 begin
   ReportMemoryLeaksOnShutdown := True;
+  SetExceptionMask(GetExceptionMask + [exOverflow, exInvalidOp]);
   Randomize();
 end;
 

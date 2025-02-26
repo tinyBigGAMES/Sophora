@@ -109,7 +109,20 @@ procedure RunTests();
 implementation
 
 const
-  CModelPath = 'C:/LLM/GGUF';
+  // Path to the directory where the LLM model (GGUF format) is stored
+  CModelPath        = 'C:/LLM/GGUF';
+
+  // Filename of the prompt database used for structured AI prompts
+  CPromptDbFilename = 'prompts.txt';
+
+  // Identifier for the "DeepThink" prompt within the prompt database
+  CPromptDeepThink  = 'DeepThink';
+
+  // Maximum context size for the LLM (8K tokens)
+  CMaxContext       = 1024 * 8;
+
+  // Toggle show "thinking" tokens on/off
+  CShowThinking = False;
 
 {
   This example demonstrates how to utilize DeepHermesLarge Language Model (LLM)
@@ -201,15 +214,22 @@ end;
   detailed thoughts within <think></think> XML tags before delivering a final
   answer.
 
-  The function initializes a message queue and inference engine, loads the
-  model, and processes a user query using a structured reasoning approach. The
-  response includes both the AI's internal thought process and the final
-  answer. Performance metrics, including input tokens, output tokens, and
-  processing speed, are displayed at the end of execution.
+  The function performs the following steps:
+  1. Initializes a message queue, inference engine, and prompt database.
+  2. Loads the LLM model and retrieves a predefined "DeepThink" prompt.
+  3. Provides structured reasoning instructions to the model.
+  4. Processes a complex user query.
+  5. Displays the AI's reasoning process and final response.
+  6. Outputs performance metrics, including input tokens, output tokens, and
+     processing speed.
+
+  This approach is useful for applications requiring in-depth AI reasoning and
+  systematic thought processing.
 }
+
 procedure Test02();
 var
-  // Stores the messages exchanged between user and LLM
+  // Stores the messages exchanged between the user and LLM
   LMsg: TsoMessages;
 
   // Represents the inference engine responsible for running the LLM
@@ -223,16 +243,23 @@ var
 
   // Represents the speed of token generation (tokens per second)
   LTokenSpeed: Single;
+
+  // Database for managing reusable AI prompts
+  LPrompts: TsoPromptDatabase;
+
+  // Stores the retrieved prompt from the database
+  LPrompt: TsoPrompt;
 begin
-  // Set console title
+  // Set the console title for the test
   soConsole.SetTitle('Sophora: Thinking Mode');
 
-  // Create instances of message handler and inference engine
+  // Create instances of message handler, inference engine, and prompt database
   LMsg := TsoMessages.Create();
   LInf := TsoInference.Create();
+  LPrompts := TsoPromptDatabase.Create();
 
   try
-    // Set model path
+    // Set the model path before loading
     LInf.SetModelPath(CModelPath);
 
     // Load the LLM model; exit if loading fails
@@ -246,20 +273,30 @@ begin
         soConsole.Print(soCSIFGGreen + AToken);
       end;
 
+    // Load prompts from the file; exit if loading fails
+    if not LPrompts.LoadFromFile(CPromptDbFilename) then Exit;
+
+    // Retrieve the "DeepThink" prompt; exit if not found
+    if not LPrompts.GetPrompt(CPromptDeepThink, LPrompt) then Exit;
+
     // Provide a system instruction that enables deep reasoning mode
-    LMsg.Add(soSystem, 'You are a deep thinking AI, you may use extremely long chains of thought to deeply consider the problem and deliberate with yourself via systematic reasoning processes to help come to a correct solution prior to answering. You should enclose your thoughts and internal monologue inside <think> </think> XML tags, and then provide your solution or response to the problem. After your thinking process, clearly state your final answer or conclusion outside the XML tags.');
+    LMsg.Add(soSystem, LPrompt.Prompt);
 
     // Add a complex user query to be analyzed in deep thinking mode
-    LMsg.Add(soUser, 'I walk on four legs in the morning, two legs at noon, and three legs in the evening. But beware, for this is not the famous riddle of the Sphinx. Instead, my journey is cyclical, and each stage is both an end and a beginning. I am not a creature, but I hold the essence of all creatures within me. What am I?');
+    LMsg.Add(soUser, 'I walk on four legs in the morning, two legs at noon, and three legs in the evening. ' +
+                      'But beware, for this is not the famous riddle of the Sphinx. Instead, my journey is cyclical, ' +
+                      'and each stage is both an end and a beginning. I am not a creature, but I hold the essence of ' +
+                      'all creatures within me. What am I?');
 
     // Print the user question with formatting
-    soConsole.PrintLn('Question: %s%s' + soCRLF, [soCSIFGCyan + soCRLF, soConsole.WrapTextEx(LMsg.LastUser(), 120-10)]);
+    soConsole.PrintLn('Question: %s%s' + soCRLF,
+      [soCSIFGCyan + soCRLF, soConsole.WrapTextEx(LMsg.LastUser(), 120 - 10)]);
 
     // Print response header
     soConsole.PrintLn('Response:');
 
     // Execute inference with the provided user query
-    if LInf.Run(LMsg) then
+    if LInf.Run(LMsg, CMaxContext) then
     begin
       // Retrieve and display performance metrics
       LInf.Performance(@LInputTokens, @LOutputTokens, @LTokenSpeed);
@@ -276,6 +313,7 @@ begin
     end;
   finally
     // Free allocated resources to avoid memory leaks
+    if Assigned(LPrompts) then LPrompts.Free();
     if Assigned(LInf) then LInf.Free();
     if Assigned(LMsg) then LMsg.Free();
   end;
@@ -704,6 +742,229 @@ begin
   end;
 end;
 
+var
+  // Global instance of the tool management system
+  LTools: TsoTools;
+
+type
+  // Tools static class
+  {$M+}
+  MyTools = class
+  published
+    // Document the tool method
+    [soSchemaDescription('Provides access to the internet to perform a web search and return the answer as a string. Only call when you can not answer the query and for real-time, time sensitive information')]
+    class function web_search(
+      // Document the tool method params
+      [soSchemaDescription('A string containing the result of the search query')]
+       query: string
+    ): string; static;
+  end;
+  {$M-}
+
+// Websearch tool function
+class function MyTools.web_search(query: string): string;
+begin
+  Result := LTools.WebSearch(query.Trim()).Trim();
+end;
+
+{
+  This example demonstrates how to integrate tool-based reasoning with
+  DeepHermes-3, leveraging web search for real-time information retrieval and
+  processing.
+
+  The procedure performs the following steps:
+  1. Loads a predefined prompt database.
+  2. Creates an instance of `TsoTools` to manage external tool calls.
+  3. Defines a `web_search` tool function that:
+     - Receives queries as function call parameters.
+     - Performs a web search using `ATools.CallTool()`.
+     - Formats the retrieved response into an LLM-compatible message.
+     - Passes the result back into the LLM for further processing.
+  4. Constructs a message sequence with a system prompt.
+  5. Calls the inference engine (`TsoInference`) to process the request.
+  6. Displays the LLM-generated response and performance metrics.
+
+  This implementation is useful for Retrieval-Augmented Generation (RAG) and
+  AI-assisted real-time fact-checking.
+
+  NOTE: You must have your Tavily account setup and the TAVILY_API_KEY
+  environment variable defined.
+}
+
+procedure Test08();
+var
+  // Object to manage predefined prompts
+  LPromptDB: TsoPromptDatabase;
+
+  // Holds a retrieved prompt
+  LPrompt: TsoPrompt;
+
+  // Message queue for communication with the LLM
+  LMsg: TsoMessages;
+
+  // Inference engine instance
+  LInf: TsoInference;
+
+  // Performance tracking variables
+  LTokenSpeed: Single;
+  LInputTokens, LOutputTokens: Integer;
+begin
+  // Create an instance of the prompt database
+  LPromptDB := TsoPromptDatabase.Create();
+
+  try
+    // Load the prompt database from file; exit if loading fails
+    if not LPromptDB.LoadFromFile(CPromptDbFilename) then Exit;
+
+    // Initialize tool management system
+    LTools := TsoTools.Create();
+
+    try
+      // Associate prompts with the tool system
+      LTools.SetPrompts(LPromptDB);
+
+      // Register the "web_search" tool
+      LTools.Add(
+        MyTools,
+        'web_search',
+
+        // Tool function definition
+        procedure(const ATools: TsoTools; const AMessages: TsoMessages;
+                  const AInference: TsoInference; const AToolCall: TsoToolCall)
+        var
+          LArgs: TsoParamArg;
+          LResponse: string;
+        begin
+          // Ensure all required objects are assigned
+          if not Assigned(ATools) or not Assigned(AMessages) or
+             not Assigned(AInference) or not Assigned(AToolCall) then Exit;
+
+          // Print function call information
+          soConsole.PrintLn();
+          soConsole.PrintLn();
+          soConsole.PrintLn(soCSIFGYellow + 'tool_call: "web_search"...');
+
+          // Loop through parameters and perform web search
+          for LArgs in AToolCall.Params do
+          begin
+            // Execute web search and retrieve response
+            LResponse := ATools.CallTool(AToolCall.GetClass(), AToolCall.FuncName, [LArgs.Value]).AsString;
+
+            // Clear previous messages
+            AMessages.Clear();
+
+            // Retrieve and apply the structured system prompt
+            ATools.GetPrompts().GetPrompt(CsoDeepThinkID, LPrompt);
+            AMessages.Add(soSystem, LPrompt.Prompt);
+
+            // Add the web search response as a user message
+            AMessages.Add(soUser, LResponse);
+          end;
+
+          // Run inference on the processed query
+          if not AInference.Run(AMessages, CMaxContext) then
+          begin
+            // If inference fails, print an error message
+            soConsole.PrintLn();
+            soConsole.PrintLn();
+            soConsole.PrintLn(soCSIFGRed + 'Error: %s', [AInference.GetError()]);
+          end;
+        end
+      );
+
+      // Create message queue for inference
+      LMsg := TsoMessages.Create();
+
+      try
+        // Retrieve the structured system prompt
+        LTools.GetPrompts().GetPrompt(CsoDeepThinkID, LPrompt);
+        LMsg.Add(soSystem, LPrompt.Prompt);
+
+        // Trigger the tool-based prompt call
+        LMsg.Add(soSystem, LTools.CallPrompt());
+
+        // Add a user query that requires real-time information
+        LMsg.Add(soUser, 'What is the current U.S. national debt as of 2025?');
+        //LMsg.Add(soUser, 'What is Bill Gates''s current net worth as of 2025?');
+        //LMsg.Add(soUser, 'lookup about the letter that D.O.G.E department sent to all federal empolyees recently?');
+        //LMsg.Add(soUser, 'what is the latest information about the 2025 california fires?');
+        //LMsg.Add(soUser, 'what is the latest D.O.G.E information about the 2025?');
+        //LMsg.Add(soUser, 'are MAGA supporters regretting their decision to vote for Trump?');
+        //LMsg.Add(soUser, 'what is Trump''s current approval rating as of Feburary 2025?');
+        //LMsg.Add(soUser, 'how much as Captain America: Brave New World earned at the box officemade at the box office so far?');
+
+        // Create and configure the inference engine
+        LInf := TsoInference.Create();
+
+        try
+          // Define event handlers for token generation
+          LInf.NextTokenEvent :=
+            procedure (const AToken: string)
+            begin
+              soConsole.Print(soCSIFGGreen + soCSIBold + soUtils.SanitizeFromJson(AToken));
+            end;
+
+          // Define thinking state events
+          LInf.ThinkStartEvent :=
+            procedure()
+            begin
+              soConsole.Print(soCSIFGBrightWhite + soCRLF+'Thinking...');
+            end;
+
+          LInf.ThinkEndEvent :=
+            procedure()
+            begin
+              soConsole.ClearLine();
+              soConsole.PrintLn();
+              soConsole.PrintLn(soCSIFGCyan + soUtils.GetRandomThinkingResult());
+            end;
+
+          // Enable "thinking" mode if configured
+          LInf.ShowThinking := CShowThinking;
+
+          // Load the LLM model; exit if loading fails
+          if not LInf.LoadModel() then Exit;
+
+          // Run inference with the given message sequence
+          if LInf.Run(LMsg, CMaxContext) then
+          begin
+            // Execute tool-based processing with the inference results
+            LTools.Call(LMsg, LInf, LInf.Response());
+
+            // Display performance metrics
+            LInf.Performance(@LInputTokens, @LOutputTokens, @LTokenSpeed);
+            soConsole.PrintLn(soCRLF + soCRLF + 'Performance:' + soCRLF +
+              soCSIFGYellow + 'Input : %d tokens' + soCRLF +
+              'Output: %d tokens' + soCRLF +
+              'Speed : %3.2f tokens/sec',
+              [LInputTokens, LOutputTokens, LTokenSpeed]);
+          end
+          else
+          begin
+            // Print an error message if inference fails
+            soConsole.PrintLn();
+            soConsole.PrintLn();
+            soConsole.PrintLn(soCSIFGRed + 'Error: %s', [LInf.GetError()]);
+          end;
+
+        finally
+          // Free the inference engine object
+          LInf.Free();
+        end;
+      finally
+        // Free the message queue object
+        LMsg.Free();
+      end;
+    finally
+      // Free the tool management system
+      LTools.Free();
+    end;
+  finally
+    // Free the prompt database object
+    LPromptDB.Free();
+  end;
+end;
+
 
 {
   This procedure serves as a test harness for running different test cases
@@ -718,25 +979,36 @@ var
   // Holds the test number to execute
   LNum: Integer;
 begin
-  // Print the Sophora version in magenta for visibility
-  soConsole.PrintLn(soCSIFGMagenta + 'Sophora v%s' + soCRLF, [CsoSophoraVersion]);
+  try
 
-  // Set the test number to execute
-  LNum := 01;
+    // Print the Sophora version in magenta for visibility
+    soConsole.PrintLn(soCSIFGMagenta + 'Sophora v%s' + soCRLF, [CsoSophoraVersion]);
 
-  // Execute the corresponding test based on the selected test number
-  case LNum of
-    01: Test01();  // Runs the non-thinking mode test
-    02: Test02();  // Runs the deep-thinking mode test
-    03: Test03();  // Runs the embedding generation test
-    04: Test04();  // Runs the sqlite database test
-    05: Test05();  // Runs the vector database test
-    06: Test06();  // Runs the web search test
-    07: Test07();  // Runs the prompt database test
+    // Set the test number to execute
+    LNum := 01;
+
+    // Execute the corresponding test based on the selected test number
+    case LNum of
+      01: Test01();  // Runs the non-thinking mode test
+      02: Test02();  // Runs the deep-thinking mode test
+      03: Test03();  // Runs the embedding generation test
+      04: Test04();  // Runs the sqlite database test
+      05: Test05();  // Runs the vector database test
+      06: Test06();  // Runs the web search test
+      07: Test07();  // Runs the prompt database test
+      08: Test08();  // Runs the tool call with web_search test
+    end;
+
+  except
+    on E: Exception do
+    begin
+      soConsole.PrintLn('Error: %s', [E.Message]);
+    end;
   end;
 
   // Pause execution to allow viewing the console output before exiting
   soConsole.Pause();
+
 end;
 
 

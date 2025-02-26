@@ -29,7 +29,7 @@ Get the latest version of Sophora and set up the toolkit:
 ### 2️⃣ Download the Model
 Sophora requires **DeepHermes-3**, which can be downloaded from **Hugging Face**:
 
-[DeepHermes-3-Llama-3-8B-Preview-Q4_K_M-GGUF](https://huggingface.co/tinybiggames/DeepHermes-3-Llama-3-8B-Preview-Q4_K_M-GGUF/resolve/main/deephermes-3-llama-3-8b-preview-q4_k_m.gguf?download=true)
+[DeepHermes-3-Llama-3-8B-Preview-abliterated-Q4_K_M-GGUF](https://huggingface.co/tinybiggames/DeepHermes-3-Llama-3-8B-Preview-abliterated-Q4_K_M-GGUF/resolve/main/deephermes-3-llama-3-8b-preview-abliterated-q4_k_m.gguf?download=true)
 
 - Place the downloaded model in the desired location (default: `C:/LLM/GGUF`).
 - Ensure the model file is correctly placed before running the inference engine.
@@ -110,6 +110,11 @@ Speed : 49.68 tokens/sec
 ## ⚠️ Repository Status
 🚧 **Note:** This repository is currently in the **setup phase**, and full documentation is not yet available. However, the code is fully functional and generally stable. Additional **examples, guides, and API documentation** will be added soon. Stay tuned—this README, along with other resources, will be continuously updated! 🚀
 
+## 📺 Media
+🌊 Deep Dive Podcast  
+Discover in-depth discussions and insights about Sophora and its innovative features. 🚀✨
+
+
 ## 🛠️ Support and Resources
 
 - 🐞 **Report issues** via the [Issue Tracker](https://github.com/tinyBigGAMES/Sophora/issues).
@@ -136,6 +141,20 @@ Your contributions make a difference! 🙌✨
 
 **Sophora** is distributed under the **🆓 BSD-3-Clause License**, allowing for redistribution and use in both source and binary forms, with or without modification, under specific conditions.  
 See the [📜 LICENSE](https://github.com/tinyBigGAMES/Sophora?tab=BSD-3-Clause-1-ov-file#BSD-3-Clause-1-ov-file) file for more details.
+
+## 💖 Sponsoring
+
+If you find this project useful, please consider [sponsoring this project](https://github.com/sponsors/tinyBigGAMES). Your support helps sustain development, improve features, and keep the project thriving.
+
+If you're unable to support financially, there are many other ways to contribute:
+- ⭐ **Star the repo** – It helps increase visibility and shows appreciation.
+- 📢 **Spread the word** – Share the project with others who might find it useful.
+- 🐛 **Report bugs** – Help improve the project by identifying and reporting issues.
+- 🔧 **Submit fixes** – Found a bug? Fix it and contribute!
+- 💡 **Make suggestions** – Share ideas for improvements and new features.
+
+Every contribution, big or small, helps make this project better. Thank you for your support! 🚀
+
 
 ---
 

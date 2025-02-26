@@ -23,15 +23,23 @@ interface
 
 uses
   System.Generics.Collections,
+  System.Rtti,
   System.SysUtils,
   System.IOUtils,
   System.Classes,
+  System.RegularExpressions,
   Sophora.Utils,
-  Sophora.Common;
+  Sophora.Common,
+  Sophora.Messages,
+  Sophora.Inference;
 
 const
   { WebSearch API Key environment variable name }
   CsoWebSearchApiKeyEnvVar = 'TAVILY_API_KEY';
+
+  CsoDeepThinkID    = 'DeepThink';
+  CsoToolCallID     = 'ToolCall';
+  CsoToolResponseID = 'ToolResponse';
 
 type
   { TsoPrompt }
@@ -48,6 +56,9 @@ type
   public
     constructor Create(); override;
     destructor Destroy(); override;
+    procedure Clear();
+    function  Count(): Integer;
+    function  Load(const APrompts: TsoPromptDatabase): Boolean;
     function  LoadFromFile(const AFilename: string): Boolean;
     function  SaveToFile(const AFilename: string): Boolean;
     procedure AddPrompt(const AID, ADescription, APrompt: string);
@@ -68,6 +79,65 @@ type
     function Response(): string;
   end;
 
+  { TsoParamArg }
+  TsoParamArg = TPair<string, string>;
+
+  { TsoParams }
+  TsoParams = TDictionary<string, string>;
+
+  { TsoToolCall }
+  TsoToolCall = class
+  private
+    FFuncName: string;
+    FParams: TsoParams;
+    FClass: TClass;
+  public
+    constructor Create(const AFuncName: string);
+    destructor Destroy(); override;
+    procedure SetClass(const AClass: TClass);
+    function  GetClass(): TClass;
+    property FuncName: string read FFuncName;
+    property Params: TsoParams read FParams;
+  end;
+
+  { TsoToolCalls }
+  TsoToolCalls = TArray<TsoToolCall>;
+
+  TsoTools = class;
+
+  { TsoToolCallEvent }
+  TsoToolCallEvent = reference to procedure(const ATools: TsoTools; const AMessages: TsoMessages; const AInference: TsoInference; const AFunctionCall: TsoToolCall);
+
+  { TsoTools }
+  TsoTools = class(TsoBaseObject)
+  protected type
+    TTool = record
+      Name: string;
+      Schema: string;
+      ToolCallEvent: TsoToolCallEvent;
+      Class_: TClass;
+    end;
+  protected
+    FList: TDictionary<string, TTool>;
+    FPrompts: TsoPromptDatabase;
+    function  ParseToolCalls(const AInput: string): TsoToolCalls;
+    procedure FreeFunctionCalls(var AFuncCalls: TsoToolCalls);
+  public
+    constructor Create(); override;
+    destructor Destroy(); override;
+    function  GetPrompts(): TsoPromptDatabase;
+    procedure SetPrompts(const APrompts: TsoPromptDatabase);
+    procedure Clear();
+    function  Add(const AClass: TClass; const AMethodName: string; const AToolcallEvent: TsoToolCallEvent): Boolean;
+    function  Count(): Integer;
+    function  CallPrompt(): string;
+    function  ResponsePrompt(const AQuestion, AResponse: string): string;
+    procedure Call(const AMessages: TsoMessages; const AInference: TsoInference; const AInput: string);
+    function  CallTool(const AClass: TClass; const AMethodName: string; const AArgs: array of TValue): TValue;
+
+    function  WebSearch(const AQuestion: string): string;
+  end;
+
 implementation
 
 { TsoPromptDatabase }
@@ -83,6 +153,36 @@ begin
   FPrompts.Free;
 
   inherited;
+end;
+
+procedure TsoPromptDatabase.Clear();
+begin
+  FPrompts.Clear();
+end;
+
+function  TsoPromptDatabase.Count(): Integer;
+begin
+  Result := FPrompts.Count;
+end;
+
+function  TsoPromptDatabase.Load(const APrompts: TsoPromptDatabase): Boolean;
+var
+  LPrompts: TArray<TsoPrompt>;
+  LPrompt: TsoPrompt;
+begin
+  Result := False;
+  if not Assigned(APrompts) then Exit;
+  if APrompts.Count() = 0 then Exit;
+
+  Clear();
+
+  LPrompts := APrompts.GetPrompts();
+
+  for LPrompt in LPrompts do
+  begin
+    AddPrompt(LPrompt.ID, LPrompt.Description, LPrompt.Prompt);
+  end;
+
 end;
 
 function TsoPromptDatabase.LoadFromFile(const AFilename: string): Boolean;
@@ -266,6 +366,218 @@ end;
 function TsoWebSearch.Response(): string;
 begin
   Result := FResponse;
+end;
+
+{ TsoToolCall }
+constructor TsoToolCall.Create(const AFuncName: string);
+begin
+  FFuncName := AFuncName;
+  FParams := TDictionary<string, string>.Create;
+end;
+
+destructor TsoToolCall.Destroy;
+begin
+  FParams.Free;
+  inherited;
+end;
+
+procedure TsoToolCall.SetClass(const AClass: TClass);
+begin
+  FClass := AClass;
+end;
+
+function  TsoToolCall.GetClass(): TClass;
+begin
+  Result := FClass;
+end;
+
+{ TsoTools }
+function  TsoTools.ParseToolCalls(const AInput: string): TsoToolCalls;
+var
+  LRegex, LParamRegex: TRegEx;
+  LMatches, LParamMatches: TMatchCollection;
+  LMatch, LParamMatch: TMatch;
+  LFuncList: TList<TsoToolCall>;
+  LFuncCall: TsoToolCall;
+  LParamStr, LParamKey, LParamValue: string;
+  LParams: TStringList;
+begin
+  LRegex := TRegEx.Create('(\w+)\(([^)]*)\)');
+  LParamRegex := TRegEx.Create('(\w+)\s*=\s*"?([^"]+?)"?(?=,|$)');
+  LMatches := LRegex.Matches(AInput);
+  LFuncList := TList<TsoToolCall>.Create;
+
+  for LMatch in LMatches do
+  begin
+    LFuncCall := TsoToolCall.Create(LMatch.Groups[1].Value);
+    LParams := TStringList.Create;
+    try
+      LParamStr := LMatch.Groups[2].Value;
+      LParamMatches := LParamRegex.Matches(LParamStr);
+
+  for LParamMatch in LParamMatches do
+      begin
+        LParamKey := LParamMatch.Groups[1].Value;
+        LParamValue := LParamMatch.Groups[2].Value;
+        LFuncCall.FParams.Add(LParamKey, LParamValue);
+      end;
+      LFuncList.Add(LFuncCall);
+    except
+      LFuncCall.Free;
+    end;
+    LParams.Free;
+  end;
+
+  Result := LFuncList.ToArray;
+  LFuncList.Free;
+end;
+
+procedure TsoTools.FreeFunctionCalls(var AFuncCalls: TsoToolCalls);
+var
+  I: Integer;
+begin
+  for I := Low(AFuncCalls) to High(AFuncCalls) do
+    AFuncCalls[I].Free;
+  SetLength(AFuncCalls, 0);
+end;
+
+constructor TsoTools.Create();
+begin
+  inherited;
+  FList := TDictionary<string, TTool>.Create();
+  FPrompts := TsoPromptDatabase.Create();
+end;
+
+destructor TsoTools.Destroy();
+begin
+  FPrompts.Free();
+  FList.Free();
+  inherited;
+end;
+
+function  TsoTools.GetPrompts(): TsoPromptDatabase;
+begin
+  Result := FPrompts;
+end;
+
+procedure TsoTools.SetPrompts(const APrompts: TsoPromptDatabase);
+begin
+  FPrompts.Load(APrompts);
+end;
+
+procedure TsoTools.Clear();
+begin
+  FList.Clear();
+end;
+
+function  TsoTools.Add(const AClass: TClass; const AMethodName: string; const AToolcallEvent: TsoToolCallEvent): Boolean;
+var
+  LTool: TTool;
+begin
+  Result := False;
+
+  if not Assigned(AClass) then Exit;
+  if AMethodName.IsEmpty then Exit;
+  if not Assigned(AToolcallEvent) then Exit;
+
+  LTool := Default(TTool);
+
+  LTool.Schema := soUtils.GetJsonSchema(AClass, AMethodName).Trim();
+  if LTool.Schema.IsEmpty then Exit;
+
+  LTool.Name := AMethodName;
+  LTool.ToolCallEvent := AToolcallEvent;
+  LTool.Class_ := AClass;
+
+  Result := FList.TryAdd(AMethodName, LTool);
+end;
+
+function  TsoTools.Count(): Integer;
+begin
+  Result := FList.Count;
+end;
+
+function  TsoTools.CallPrompt(): string;
+var
+  LPair: TPair<string, TTool>;
+  LSchemes: string;
+  I: Integer;
+  LPrompt: TsoPrompt;
+begin
+  Result := '';
+
+  LSchemes := '';
+
+  for LPair in FList do
+  begin
+    LSchemes := LSchemes + LPair.Value.Schema + ',' + #10#13;
+  end;
+
+  if LSchemes.EndsWith(','+#10#13) then
+  begin
+    I := LSchemes.LastIndexOf(','+#10#13);
+    LSchemes := LSchemes.Remove(I, 3);
+  end;
+
+  FPrompts.GetPrompt(CsoToolCallID, LPrompt);
+  Result := Format(LPrompt.Prompt, [soUtils.GetLocalDateTime(), LSchemes]);
+end;
+
+function  TsoTools.ResponsePrompt(const AQuestion, AResponse: string): string;
+var
+  LPrompt: TsoPrompt;
+begin
+  FPrompts.GetPrompt(CsoToolResponseID, LPrompt);
+  Result := Format(LPrompt.Prompt, [AQuestion, AResponse]);
+end;
+
+procedure TsoTools.Call(const AMessages: TsoMessages; const AInference: TsoInference; const AInput: string);
+var
+  LTool: TTool;
+  LToolCalls: TsoToolCalls;
+  LItem: TsoToolCall;
+  LToolCall: TsoToolCall;
+begin
+  if not Assigned(AMessages) then Exit;
+  if not Assigned(AInference) then Exit;
+
+  if AInput.IsEmpty then Exit;
+
+  LToolCalls := ParseToolCalls(AInput);
+  try
+    for LItem in LToolCalls do
+    begin
+      if FList.TryGetValue(LItem.FuncName, LTool) then
+      begin
+        LToolCall := LItem;
+        LToolCall.SetClass(LTool.Class_);
+        LTool.ToolCallEvent(Self, AMessages, AInference, LToolCall);
+      end;
+    end;
+  finally
+    FreeFunctionCalls(LToolCalls);
+  end;
+end;
+
+function  TsoTools.CallTool(const AClass: TClass; const AMethodName: string; const AArgs: array of TValue): TValue;
+begin
+  Result := soUtils.CallStaticMethod(AClass, AMethodName, AArgs);
+end;
+
+function  TsoTools.WebSearch(const AQuestion: string): string;
+var
+  LWebSearch: TsoWebSearch;
+
+begin
+  LWebSearch := TsoWebSearch.Create();
+  try
+    if LWebSearch.Query(AQuestion) then
+    begin
+      Result := ResponsePrompt(AQuestion, LWebSearch.Response());
+    end;
+  finally
+    LWebSearch.Free();
+  end;
 end;
 
 end.

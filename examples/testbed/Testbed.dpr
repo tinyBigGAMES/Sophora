@@ -35,10 +35,5 @@ uses
   Sophora.Tools in '..\..\src\Sophora.Tools.pas';
 
 begin
-  try
-    RunTests();
-  except
-    on E: Exception do
-      Writeln(E.ClassName, ': ', E.Message);
-  end;
+  RunTests();
 end.

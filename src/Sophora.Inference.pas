@@ -306,41 +306,27 @@ begin
     FTokenSpeed := 0;
 end;
 
-(*
-procedure TsoInference.OnInfo(const ALevel: Integer; const AText: string);
-begin
-  //atConsole.Print(AText);
-end;
-
-function  TsoInference.OnLoadModelProgress(const AModelFilename: string; const AProgress: Single): Boolean;
-begin
-  Result := True;
-
-  //atConsole.Print(#13+'Loading model "%s" (%3.2f%s)...', [AModelFilename, AProgress*100, '%']);
-end;
-
-procedure TsoInference.OnLoadModel(const AModelFilename: string; const ASuccess: Boolean);
-begin
-end;
-*)
-
 procedure TsoInference.DoOnNextToken(const AToken: string);
 var
   LToken: string;
+  LThinkToken: string;
 begin
   LToken := AToken;
   LToken := soUtils.SanitizeFromJson(LToken);
 
   FResponse := FResponse + LToken;
 
-  if LToken.StartsWith('<think>') then
+  LThinkToken := LToken;
+  LThinkToken := LThinkToken.Trim().Replace(#10, '').Replace(#13, '');
+
+  if LThinkToken.StartsWith('<think>') then
     begin
       LToken := '';
       FThinking := True;
       OnThinkStart();
     end
   else
-  if LToken.StartsWith('</think>') then
+  if LThinkToken.StartsWith('</think>') then
     begin
       LToken := '';
       FThinking := False;
