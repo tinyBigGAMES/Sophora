@@ -18,7 +18,7 @@
 {
   ===== USAGE NOTES =====
   * Download model from:
-   - https://huggingface.co/tinybiggames/DeepHermes-3-Llama-3-8B-Preview-Q4_K_M-GGUF/resolve/main/deephermes-3-llama-3-8b-preview-q4_k_m.gguf?download=true
+   - https://huggingface.co/tinybiggames/DeepHermes-3-Llama-3-8B-Preview-abliterated-Q4_K_M-GGUF/resolve/main/deephermes-3-llama-3-8b-preview-abliterated-q4_k_m.gguf?download=true
   * Place in your desired location, the examples expect:
    - C:/LLM/GGUF
 
@@ -174,7 +174,7 @@ begin
       end;
 
     // Add a user query to the message queue
-    LMsg.Add(soUser, 'who is bill gates?');
+    LMsg.Add(soUser, 'who is bill gates? (very detailed)');
 
     // Print the user question with formatting
     soConsole.PrintLn('Question: %s%s' + soCRLF, [soCSIFGCyan + soCRLF, LMsg.LastUser()]);

@@ -796,6 +796,7 @@ begin
   if llama_decode(LContext, LBatch) < 0 then
     begin
       SetError('LLaMA encoding failed!', []);
+      llama_batch_free(LBatch);
       llama_free(LContext);
       Exit;
     end;

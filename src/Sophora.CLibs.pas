@@ -2700,6 +2700,7 @@ var
   llama_model_n_embd: function(const model: Pllama_model): Int32; cdecl;
   llama_model_n_layer: function(const model: Pllama_model): Int32; cdecl;
   llama_model_n_head: function(const model: Pllama_model): Int32; cdecl;
+  llama_model_n_head_kv: function(const model: Pllama_model): Int32; cdecl;
   llama_model_rope_freq_scale_train: function(const model: Pllama_model): Single; cdecl;
   llama_vocab_type_rtn: function(const vocab: Pllama_vocab): llama_vocab_type; cdecl;
   llama_vocab_n_tokens: function(const vocab: Pllama_vocab): Int32; cdecl;
@@ -3672,6 +3673,7 @@ begin
   llama_model_n_ctx_train := GetProcAddress(aDLLHandle, 'llama_model_n_ctx_train');
   llama_model_n_embd := GetProcAddress(aDLLHandle, 'llama_model_n_embd');
   llama_model_n_head := GetProcAddress(aDLLHandle, 'llama_model_n_head');
+  llama_model_n_head_kv := GetProcAddress(aDLLHandle, 'llama_model_n_head_kv');
   llama_model_n_layer := GetProcAddress(aDLLHandle, 'llama_model_n_layer');
   llama_model_n_params := GetProcAddress(aDLLHandle, 'llama_model_n_params');
   llama_model_quantize := GetProcAddress(aDLLHandle, 'llama_model_quantize');
