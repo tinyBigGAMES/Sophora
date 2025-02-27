@@ -19,6 +19,7 @@
   ===== USAGE NOTES =====
   * Download model from:
    - https://huggingface.co/tinybiggames/DeepHermes-3-Llama-3-8B-Preview-abliterated-Q4_K_M-GGUF/resolve/main/deephermes-3-llama-3-8b-preview-abliterated-q4_k_m.gguf?download=true
+   - https://huggingface.co/tinybiggames/bge-m3-Q8_0-GGUF/resolve/main/bge-m3-q8_0.gguf?download=true
   * Place in your desired location, the examples expect:
    - C:/LLM/GGUF
 
@@ -94,6 +95,7 @@ interface
 uses
   System.Generics.Collections,
   System.SysUtils,
+  System.IOUtils,
   System.JSON,
   Sophora.CLibs,
   Sophora.Utils,
@@ -334,7 +336,7 @@ procedure Test03();
 var
   // Represents the embedding engine responsible for generating vector
   // representations
-  LInf: TsoInference;
+  LEmb: TsoEmbeddings;
 
   // Stores the resulting embedding vector (array of floating-point numbers)
   LResult: TArray<Single>;
@@ -352,14 +354,14 @@ begin
   soConsole.SetTitle('Sophora: Embeddings');
 
   // Create an instance of the embedding engine
-  LInf := TsoInference.Create();
+  LEmb := TsoEmbeddings.Create();
 
   try
     // Set model path
-    LInf.SetModelPath(CModelPath);
+    LEmb.SetModelPath(CModelPath);
 
     // Load the embedding model; exit if loading fails
-    if not LInf.LoadModel() then Exit;
+    if not LEmb.LoadModel() then Exit;
 
     // Define the text prompt to be embedded
     LPrompt := 'Explain how data analysis supports machine learning.';
@@ -368,7 +370,7 @@ begin
     soConsole.PrintLn('Prompt: %s%s' + soCRLF, [soCSIFGCyan + soCRLF, LPrompt]);
 
     // Generate the embedding vector from the given prompt
-    LResult := LInf.Embeddings(LPrompt);
+    LResult := LEmb.Generate(LPrompt);
 
     // Print the header for the embedding values
     soConsole.PrintLn('Embeddings:');
@@ -393,7 +395,7 @@ begin
 
   finally
     // Free allocated resources to avoid memory leaks
-    LInf.Free();
+    LEmb.Free();
   end;
 end;
 
@@ -504,7 +506,7 @@ procedure Test05();
 var
   // Represents the embedding engine responsible for generating vector
   // representations
-  LInf: TsoInference;
+  LEmb: TsoEmbeddings;
 
   // Object representing the vector database
   LVectorDB: TsoVectorDatabase;
@@ -534,21 +536,21 @@ begin
   soConsole.SetTitle('Sophora: Vector Database');
 
   // Create an instance of the embedding engine
-  LInf := TsoInference.Create();
+  LEmb := TsoEmbeddings.Create();
 
   try
     // Set model path
-    LInf.SetModelPath(CModelPath);
+    LEmb.SetModelPath(CModelPath);
 
     // Load embeddings model on the CPU
-    if not LInf.LoadModel(0, 0) then Exit;
+    if not LEmb.LoadModel(0, 0) then Exit;
 
     // Create an instance of the vector database
     LVectorDB := TsoVectorDatabase.Create();
 
     try
       // Open the vector database; exit if it fails
-      if not LVectorDB.Open(LInf, 'vectors.db') then Exit;
+      if not LVectorDB.Open(LEmb, 'vectors.db') then Exit;
 
       // Add sample documents to the vector database
       soConsole.PrintLn('Adding documents...');
@@ -629,7 +631,7 @@ begin
     end;
   finally
     // Close/Free embeddings engine
-    LInf.Free();
+    LEmb.Free();
   end;
 end;
 
@@ -809,6 +811,10 @@ var
   LTokenSpeed: Single;
   LInputTokens, LOutputTokens: Integer;
 begin
+  // Set the console title for the tool call test
+  soConsole.SetTitle('Sophora: Tool Call');
+
+
   // Create an instance of the prompt database
   LPromptDB := TsoPromptDatabase.Create();
 
@@ -897,6 +903,10 @@ begin
         LInf := TsoInference.Create();
 
         try
+
+          // Set model path
+          LInf.SetModelPath(CModelPath);
+
           // Define event handlers for token generation
           LInf.NextTokenEvent :=
             procedure (const AToken: string)
@@ -967,6 +977,124 @@ end;
 
 
 {
+  This example demonstrates how to use a **large vector database** for **semantic search**
+  using DeepHermes-3 embeddings. It performs the following steps:
+
+  1. Initializes the embedding model and vector database.
+  2. Checks if the vector database (`deepseek-r1.db`) exists.
+  3. If missing, reads `deepseek-r1.txt`, chunks the text, and creates the vector database.
+  4. Performs a **semantic search query** against the database.
+  5. Displays the top search results as formatted JSON.
+
+  This approach is useful for **Retrieval-Augmented Generation (RAG)** and knowledge-driven
+  AI applications.
+}
+procedure Test09();
+var
+  // Embedding engine for generating vector representations
+  LEmb: TsoEmbeddings;
+
+  // Vector database for storing and retrieving embeddings
+  LVec: TsoVectorDatabase;
+
+  // Stores input text for vectorization
+  LText: string;
+
+  // Holds the JSON response from the vector search
+  LJsonArray: TJSONArray;
+
+  // Flag indicating whether to create and chunk the database
+  LChunkDb: Boolean;
+
+  // Query string for semantic search
+  LQuery: string;
+begin
+  // Set the console title for the vector database test
+  soConsole.SetTitle('Sophora: Large Vector DB');
+
+  // Create an instance of the embedding engine
+  LEmb := TsoEmbeddings.Create();
+
+  try
+    // Set the model path before loading
+    LEmb.SetModelPath(CModelPath);
+
+    // Load the embedding model with default settings
+    if not LEmb.LoadModel(0, 0, csoDefaultEmbeddingsModelFilename) then Exit;
+
+    // Create an instance of the vector database
+    LVec := TsoVectorDatabase.Create();
+
+    try
+      // Check if the vector database already exists
+      LChunkDb := not TFile.Exists('deepseek-r1.db');
+
+      // Open the vector database, linked to the embedding model
+      if not LVec.Open(LEmb, 'deepseek-r1.db') then Exit;
+
+      // If the database does not exist, create it from the source text
+      if LChunkDb then
+      begin
+        // Read the content of the source text file
+        LText := TFile.ReadAllText('deepseek-r1.txt');
+
+        // If the file is not empty, process the text into vector embeddings
+        if not LText.IsEmpty then
+        begin
+          soConsole.PrintLn(soCSIFGYellow + 'Chunking "deepseek-r1.txt"...');
+
+          // Add the large document to the vector database with chunking (size: 100)
+          if LVec.AddLargeDocument('doc-deepseekr1',
+             'DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement',
+             LText, 100) then
+            soConsole.PrintLn(soCSIFGYellow + 'Successfully created "deepseek-r1.db", vector database')
+          else
+            soConsole.PrintLn(soCSIFGRed + 'Error: %s', [LVec.GetError()]);
+        end;
+      end;
+
+      // Indicate that semantic search is being performed
+      soConsole.PrintLn(soCSIFGYellow + 'Performing semantic search in "deepseek-r1.db"...' + soCRLF);
+
+      // Define a search query
+      LQuery := 'What are the key differences between DeepSeek-R1-Zero and DeepSeek-R1?';
+
+      // Alternative queries for experimentation
+      // LQuery := 'What reinforcement learning algorithm was used for training DeepSeek-R1-Zero, and how does it work?';
+      // LQuery := 'How did majority voting impact DeepSeek-R1-Zero’s performance, and what does this reveal about its reasoning capabilities?';
+      // LQuery := 'What are the future research directions for DeepSeek-R1?';
+      // LQuery := 'Why did DeepSeek-R1-Zero struggle with readability despite its strong reasoning capabilities?';
+
+      // Print the query for visibility
+      soConsole.PrintLn('Query:');
+      soConsole.PrintLn(soCSIFGCyan + LQuery + soCRLF);
+
+      // Execute semantic search on the vector database
+      LJsonArray := LVec.Search(LQuery, 3);
+
+      // Display JSON search results if available
+      if Assigned(LJsonArray) then
+      begin
+        soConsole.PrintLn('Relevant search results:');
+        soConsole.PrintLn(soCSIFGGreen + LJsonArray.Format());
+
+        // Free the JSON array to prevent memory leaks
+        LJsonArray.Free();
+      end;
+
+    finally
+      // Free the vector database object
+      LVec.Free();
+    end;
+
+  finally
+    // Free the embedding engine object
+    LEmb.Free();
+  end;
+end;
+
+
+{
   This procedure serves as a test harness for running different test cases
   related to the Large Language Model (LLM) functionalities, such as
   non-thinking mode, deep-thinking mode, and embedding generation.
@@ -980,7 +1108,6 @@ var
   LNum: Integer;
 begin
   try
-
     // Print the Sophora version in magenta for visibility
     soConsole.PrintLn(soCSIFGMagenta + 'Sophora v%s' + soCRLF, [CsoSophoraVersion]);
 
@@ -997,6 +1124,7 @@ begin
       06: Test06();  // Runs the web search test
       07: Test07();  // Runs the prompt database test
       08: Test08();  // Runs the tool call with web_search test
+      09: Test09();
     end;
 
   except

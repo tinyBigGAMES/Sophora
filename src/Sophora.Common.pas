@@ -36,7 +36,13 @@ const
 
   CsoDefaultModelPath  = 'C:/LLM/GGUF';
 
-  CsoDefaultLLMFilename = 'deephermes-3-llama-3-8b-preview-abliterated-q4_k_m.gguf';
+  CsoDefaultModelFilename           = 'deephermes-3-llama-3-8b-preview-abliterated-q4_k_m.gguf';
+  csoDefaultEmbeddingsModelFilename = 'bge-m3-q8_0.gguf';
+
+  CsoDefaultMainGPU    = -1;
+  CsoDefaultGPULayers  = -1;
+  CsoDefaultMaxContext = 1024*4;
+  CsoDefaultMaxThreads = -1;
 
 type
 

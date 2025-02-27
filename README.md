@@ -28,9 +28,8 @@ Get the latest version of Sophora and set up the toolkit:
 
 ### 2️⃣ Download the Model
 Sophora requires **DeepHermes-3**, which can be downloaded from **Hugging Face**:
-
-[DeepHermes-3-Llama-3-8B-Preview-abliterated-Q4_K_M-GGUF](https://huggingface.co/tinybiggames/DeepHermes-3-Llama-3-8B-Preview-abliterated-Q4_K_M-GGUF/resolve/main/deephermes-3-llama-3-8b-preview-abliterated-q4_k_m.gguf?download=true)
-
+- [DeepHermes-3-Llama-3-8B-Preview-abliterated-Q4_K_M-GGUF](https://huggingface.co/tinybiggames/DeepHermes-3-Llama-3-8B-Preview-abliterated-Q4_K_M-GGUF/resolve/main/deephermes-3-llama-3-8b-preview-abliterated-q4_k_m.gguf?download=true) (General, Reasoning, Tools)
+- [bge-m3-Q8_0-GGUF](https://huggingface.co/tinybiggames/bge-m3-Q8_0-GGUF/resolve/main/bge-m3-q8_0.gguf?download=true) (Embeddings)
 - Place the downloaded model in the desired location (default: `C:/LLM/GGUF`).
 - Ensure the model file is correctly placed before running the inference engine.
 
