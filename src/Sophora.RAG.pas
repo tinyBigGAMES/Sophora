@@ -90,6 +90,13 @@ type
     function  GetResponseText(): string;
   end;
 
+  { TsoVectorDatabaseDocument }
+  TsoVectorDatabaseDocument = record
+    ID: string;
+    Score: Single;
+    Text: string;
+  end;
+
   { TsoVectorDatabase }
   TsoVectorDatabase = class(TsoBaseObject)
   private
@@ -106,6 +113,7 @@ type
     function AddDocument(const ADocID: string; const AText: string; const AMaxContext: Cardinal=1024*4; const AMaxThreads: Integer=-1): Boolean;
     function AddLargeDocument(const ADocID, ATitle, AText: string; const AChunkSize: Integer; const AMaxContext: Cardinal=1024*4; const AMaxThreads: Integer=-1): Boolean;
     function Search(const AQuery: string; const ATopK: Integer = 5; const AQueryLimit: Integer = 1000; const ASimilarityThreshold: Single=0.1; const AMaxContext: Cardinal=1024*4; const AMaxThreads: Integer=-1): TJSONArray;
+    function Search2(const AQuery: string; const ATopK: Integer = 5; const AQueryLimit: Integer = 1000; const ASimilarityThreshold: Single=0.1; const AMaxContext: Cardinal=1024*4; const AMaxThreads: Integer=-1): TArray<TsoVectorDatabaseDocument>;
   end;
 
 implementation
@@ -937,6 +945,56 @@ begin
     LSimilarityScores.Free;
     LTextMap.Free;
   end;
+end;
+
+function TsoVectorDatabase.Search2(const AQuery: string; const ATopK: Integer; const AQueryLimit: Integer; const ASimilarityThreshold: Single; const AMaxContext: Cardinal; const AMaxThreads: Integer): TArray<TsoVectorDatabaseDocument>;
+
+var
+  LJson: TJSONArray;
+
+  function ParseJSONToDocuments(const JSONArray: TJSONArray): TArray<TsoVectorDatabaseDocument>;
+  var
+    DocumentList: TList<TsoVectorDatabaseDocument>;
+    JSONObject: TJSONObject;
+    Doc: TsoVectorDatabaseDocument;
+    i: Integer;
+  begin
+    Result := nil;
+    if not Assigned(JSONArray) then
+      Exit;
+
+    DocumentList := TList<TsoVectorDatabaseDocument>.Create;
+    try
+      for i := 0 to JSONArray.Count - 1 do
+      begin
+        JSONObject := JSONArray.Items[i] as TJSONObject;
+        if Assigned(JSONObject) then
+        begin
+          Doc.ID := JSONObject.GetValue<string>('id');
+          Doc.Score := JSONObject.GetValue<Double>('score');  // JSON numbers are treated as Double
+          Doc.Text := JSONObject.GetValue<string>('text');
+          DocumentList.Add(Doc);
+        end;
+      end;
+      Result := DocumentList.ToArray;
+    finally
+      DocumentList.Free;
+    end;
+  end;
+
+begin
+  Result := nil;
+
+  LJson := Search(AQuery, ATopK, AQueryLimit, ASimilarityThreshold, AMaxContext, AMaxThreads);
+  try
+    if not Assigned(LJson) then Exit;
+
+    Result := ParseJSONToDocuments(LJson);
+  finally
+    LJson.Free();
+  end;
+
+
 end;
 
 end.

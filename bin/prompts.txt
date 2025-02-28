@@ -64,7 +64,17 @@ Prompt: |
 <question>%s</question>
 <function_result>%s</function_result>
 
-Use the information provided in <function_result> (the result of a function call) along with the query in <question> to produce a comprehensive and well-structured answer. The answer should be clear, concise, and formatted for easy reading.
+Your task is to provide an answer using ONLY information that is EXPLICITLY and DIRECTLY stated in the function_result. This is CRITICAL.
+
+ABSOLUTE REQUIREMENTS:
+1. QUOTE EXACT PHRASES from the text whenever possible.
+2. NEVER state or imply ANY causal relationships unless they appear verbatim in the text with explicit causal language.
+3. If the question asks "why" but the text only describes "what," state clearly: "[what happens] is described, but no explicit explanation for why is provided."
+4. If any aspect of the question cannot be answered with direct statements from the text, explicitly acknowledge: "[specific aspect] is not explicitly stated."
+5. DO NOT connect facts together unless the connection is explicitly stated in the text.
+6. DO NOT use phrases like "the text states," "the document mentions," "according to the provided information," etc.
+7. Present information directly as facts, not as reporting on what "the text says."
+8. If information is missing, simply state what IS known and what IS NOT known without meta-commentary.
 
 Formatting Guidelines:
 - Structure: Organize the answer into logical sections. Use Markdown headings (e.g., `#`, `##`, `###`) to title different sections as appropriate, so the content is easy to scan.
@@ -76,11 +86,55 @@ Formatting Guidelines:
 - Citations: Preserve all citation references in their original format (e.g., `【source†L...】`) if they are present in the provided text. Include them appropriately in the answer to support relevant statements.
 - Final Output Only: Do not include any reasoning steps, tool usage information, or other extraneous content. Only output the final formatted answer encapsulated in the `<answer>` tags.
 
-Now, transform the content into the final answer using the above guidelines.
+EXAMPLE:
+
+Question: "Why did X happen?"
+Text: "X happened. Later, Y was implemented."
+
+INCORRECT: "X happened because of Z." (Z isn't mentioned)
+INCORRECT: "X happened due to the absence of Y." (causal relationship not stated)
+INCORRECT: "The text states that X happened. It does not explicitly explain why X happened."
+CORRECT: "X happened. No explicit explanation for why X happened is provided."
+
+Your answer should be incomplete rather than speculative. Acknowledge gaps in the information rather than filling them with reasonable-sounding explanations.
 
 Output format:
 <answer>
-...your well-formatted answer here...
+...your strictly fact-based answer here...
 </answer>
 
+---
+ID: VectorSearchResponse
+Description: Formats and refines a given vector search response question into a structured response.
+Prompt: |
+<question>%s</question>
+<function_result>%s</function_result>
+
+Your task is to provide an answer using ONLY information that is EXPLICITLY and DIRECTLY stated in the function_result. This is CRITICAL.
+
+ABSOLUTE REQUIREMENTS:
+1. QUOTE EXACT PHRASES from the text whenever possible.
+2. NEVER state or imply ANY causal relationships unless they appear verbatim in the text with explicit causal language.
+3. If the question asks "why" but the text only describes "what," state clearly: "The provided information describes [what happens] but does not explicitly explain why."
+4. If any aspect of the question cannot be answered with direct statements from the text, explicitly acknowledge: "The text does not explicitly state [specific aspect]."
+5. DO NOT connect facts together unless the connection is explicitly stated in the text.
+
+Formatting Guidelines:
+[Your existing formatting guidelines]
+
+EXAMPLE:
+
+Question: "Why did X happen?"
+Text: "X happened. Later, Y was implemented."
+
+INCORRECT: "X happened because of Z." (Z isn't mentioned)
+INCORRECT: "X happened due to the absence of Y." (causal relationship not stated)
+CORRECT: "The text states that X happened. It does not explicitly explain why X happened."
+
+Your answer should be incomplete rather than speculative. Acknowledge gaps in the information rather than filling them with reasonable-sounding explanations.
+
+Output format:
+<answer>
+...your strictly fact-based answer here...
+</answer>
 

@@ -1046,7 +1046,7 @@ begin
           // Add the large document to the vector database with chunking (size: 100)
           if LVec.AddLargeDocument('doc-deepseekr1',
              'DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement',
-             LText, 100) then
+             LText, 200) then
             soConsole.PrintLn(soCSIFGYellow + 'Successfully created "deepseek-r1.db", vector database')
           else
             soConsole.PrintLn(soCSIFGRed + 'Error: %s', [LVec.GetError()]);
@@ -1093,6 +1093,188 @@ begin
   end;
 end;
 
+{
+  This example demonstrates **Advanced Vector Database Search & RAG Processing** using DeepHermes-3.
+  It performs the following steps:
+
+  1. **Initialize the Embedding Model & Vector Database**
+     - Loads DeepHermes embeddings model.
+     - Opens the existing vector database (`deepseek-r1.db`) or creates it if missing.
+
+  2. **Document Chunking & Storage**
+     - If `deepseek-r1.db` does not exist, reads `deepseek-r1.txt`.
+     - Splits the text into smaller chunks (200 tokens per chunk) and stores it.
+
+  3. **Perform a Semantic Search Query**
+     - Retrieves the **top 5 relevant** document chunks using `Search2()`.
+     - Uses a high recall setting (1000 tokens, 0.1 similarity threshold, CMaxContext).
+
+  4. **Context Preparation for Retrieval-Augmented Generation (RAG)**
+     - Extracts and concatenates retrieved text chunks.
+     - Loads structured prompts for processing.
+
+  5. **LLM-Based Reasoning on Retrieved Data**
+     - Uses DeepHermes-3 to analyze the retrieved context.
+     - Formats the response according to pre-defined system prompts.
+
+  This implementation is crucial for **RAG-powered AI assistants**, providing accurate,
+  **contextual retrieval** and reasoning capabilities.
+}
+procedure Test10();
+var
+  // Embedding engine for generating vector representations
+  LEmb: TsoEmbeddings;
+
+  // Vector database for storing and retrieving embeddings
+  LVec: TsoVectorDatabase;
+
+  // Stores input text for vectorization
+  LText: string;
+
+  // Holds the retrieved documents from the vector search
+  LDocs: TArray<TsoVectorDatabaseDocument>;
+
+  // Flag indicating whether to create and chunk the database
+  LChunkDb: Boolean;
+
+  // Query string for semantic search
+  LQuery: string;
+
+  // Iterator for document processing
+  I: Integer;
+
+  // LLM interaction components
+  LMsg: TsoMessages;
+  LInf: TsoInference;
+  LPromptDB: TsoPromptDatabase;
+  LPrompt: TsoPrompt;
+begin
+  // Set the console title for the vector database test
+  soConsole.SetTitle('Sophora: Large Vector DB');
+
+  // Create an instance of the embedding engine
+  LEmb := TsoEmbeddings.Create();
+  try
+    // Set the model path before loading
+    LEmb.SetModelPath(CModelPath);
+
+    // Load the embedding model with default settings
+    if not LEmb.LoadModel(0, 0, csoDefaultEmbeddingsModelFilename) then Exit;
+
+    // Create an instance of the vector database
+    LVec := TsoVectorDatabase.Create();
+    try
+      // Check if the vector database already exists
+      LChunkDb := not TFile.Exists('deepseek-r1.db');
+
+      // Open the vector database, linked to the embedding model
+      if not LVec.Open(LEmb, 'deepseek-r1.db') then Exit;
+
+      // If the database does not exist, create it from the source text
+      if LChunkDb then
+      begin
+        // Read the content of the source text file
+        LText := TFile.ReadAllText('deepseek-r1.txt');
+
+        // If the file is not empty, process the text into vector embeddings
+        if not LText.IsEmpty then
+        begin
+          soConsole.PrintLn(soCSIFGYellow + 'Chunking "deepseek-r1.txt"...');
+
+          // Add the large document to the vector database with chunking (size: 200 tokens)
+          if LVec.AddLargeDocument('doc-deepseekr1',
+             'DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement',
+             LText, 200) then
+            soConsole.PrintLn(soCSIFGYellow + 'Successfully created "deepseek-r1.db", vector database')
+          else
+            soConsole.PrintLn(soCSIFGRed + 'Error: %s', [LVec.GetError()]);
+        end;
+      end;
+
+      // Indicate that semantic search is being performed
+      soConsole.PrintLn(soCSIFGYellow + 'Performing semantic search in "deepseek-r1.db"...' + soCRLF);
+
+      // Define a search query
+      LQuery := 'What are the key differences between DeepSeek-R1-Zero and DeepSeek-R1?';
+
+      // Alternative queries for experimentation
+      // LQuery := 'Why did DeepSeek-R1-Zero struggle with readability despite its strong reasoning capabilities?';
+      // LQuery := 'What reinforcement learning algorithm was used for training DeepSeek-R1-Zero, and how does it work?';
+      // LQuery := 'How did majority voting impact DeepSeek-R1-Zero’s performance, and what does this reveal about its reasoning capabilities?';
+      // LQuery := 'How does DeepSeek-R1 perform compared to OpenAI’s o1-1217 model?';
+      // LQuery := 'How do DeepSeek-R1 distilled models compare to their RL-trained counterparts?';
+
+      // Print the query for visibility
+      soConsole.PrintLn('Query:');
+      soConsole.PrintLn(soCSIFGCyan + LQuery + soCRLF);
+
+      // Execute semantic search on the vector database with optimized parameters
+      LDocs := LVec.Search2(LQuery, 5, 1000, 0.1, CMaxContext);
+
+      // Prepare retrieved content for LLM processing
+      LText := '';
+      for I := Low(LDocs) to High(LDocs) do
+      begin
+        LText := LText + LDocs[I].Text + soCRLF;
+      end;
+      LText := LText.Trim();
+
+      // Print retrieved documents (for debugging)
+      // soConsole.PrintLn(LText);
+
+      // Load the prompt database
+      LPromptDB := TsoPromptDatabase.Create();
+      try
+        if not LPromptDB.LoadFromFile(CPromptDbFilename) then Exit;
+
+        // Create a message queue for LLM processing
+        LMsg := TsoMessages.Create();
+        try
+          // Create the inference engine
+          LInf := TsoInference.Create();
+          try
+            LInf.SetModelPath(CModelPath);
+            if not LInf.LoadModel() then Exit;
+
+            // Disable "thinking" animation for speed
+            LInf.ShowThinking := False;
+
+            // Retrieve structured reasoning prompt
+            LPromptDb.GetPrompt(CsoDeepThinkID, LPrompt);
+            LMsg.Add(soSystem, LPrompt.Prompt);
+
+            // Retrieve vector search response template
+            LPromptDb.GetPrompt(CsoVectorSearchID, LPrompt);
+            LText := Format(LPrompt.Prompt, [LQuery, LText]);
+
+            // Add retrieved search results as a user message
+            LMsg.Add(soUser, LText);
+
+            // Execute inference on the retrieved knowledge
+            LInf.Run(LMsg);
+          finally
+            // Free the inference engine
+            LInf.Free();
+          end;
+        finally
+          // Free the message queue
+          LMsg.Free();
+        end;
+      finally
+        // Free the prompt database
+        LPromptDB.Free();
+      end;
+
+    finally
+      // Free the vector database object
+      LVec.Free();
+    end;
+  finally
+    // Free the embedding engine object
+    LEmb.Free();
+  end;
+end;
+
 
 {
   This procedure serves as a test harness for running different test cases
@@ -1124,7 +1306,8 @@ begin
       06: Test06();  // Runs the web search test
       07: Test07();  // Runs the prompt database test
       08: Test08();  // Runs the tool call with web_search test
-      09: Test09();
+      09: Test09();  // Runs the large vector database search test (semantic retrieval)
+      10: Test10();  // Runs the advanced RAG-based retrieval test (LLM-enhanced search)
     end;
 
   except
@@ -1135,7 +1318,12 @@ begin
   end;
 
   // Pause execution to allow viewing the console output before exiting
-  soConsole.Pause();
+  //soConsole.Pause();
+
+  writeln;
+  write('press enter to continue...');
+  readln;
+  writeln;
 
 end;
 

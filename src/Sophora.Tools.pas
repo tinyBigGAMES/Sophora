@@ -40,6 +40,7 @@ const
   CsoDeepThinkID    = 'DeepThink';
   CsoToolCallID     = 'ToolCall';
   CsoToolResponseID = 'ToolResponse';
+  CsoVectorSearchID = 'VectorSearchResponse';
 
 type
   { TsoPrompt }
